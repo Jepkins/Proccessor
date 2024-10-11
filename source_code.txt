@@ -1,0 +1,26 @@
+push 81
+sqrt
+push 9
+push 10
+mul
+sqrt
+sub
+sin
+dub
+out
+sin
+dub
+out
+sin
+dub
+out
+sin
+dub
+out
+sin
+dub
+out
+sin
+dub
+out
+hlt
