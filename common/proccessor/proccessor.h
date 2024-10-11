@@ -1,7 +1,10 @@
 #ifndef PROCCESSROR_H
 #define PROCCESSROR_H
 
+typedef short cmd_code;
 typedef double elm_t;
+#define ELM_T_FORMAT "%lg"
+#define CMD_CODE_FORMAT "%hd"
 
 typedef enum {
     UNKNOWN = -100,

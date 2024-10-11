@@ -10,8 +10,14 @@ int main(int argc, char** argv)
 {
     StartConfig run_conds;
     asm_setup(argc, argv, &run_conds);
+
     FILE* istream = fopen(run_conds.input_file, "r");
+    if (!istream)
+        assert(0 && "could not open file");
+
     FILE* ostream = fopen(run_conds.output_file, "w");
+    if (!ostream)
+        assert(0 && "could not open file");
 
     translate(ostream, istream);
 
@@ -35,14 +41,14 @@ void translate (FILE* dst, FILE* src)
             return;
         }
 
-        fprintf(dst, "%d ", cmd);
+        fprintf(dst, CMD_CODE_FORMAT " ", cmd);
         switch (cmd)
         {
         case CMD_PUSH:
         {
             elm_t arg = 0;
-            fscanf(src, "%lg", &arg);
-            fprintf(dst, "%lg\n", arg);
+            fscanf(src, ELM_T_FORMAT, &arg);
+            fprintf(dst, ELM_T_FORMAT "\n", arg);
             break;
         }
         default:
