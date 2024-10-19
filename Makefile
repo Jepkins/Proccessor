@@ -9,7 +9,7 @@ CFLAGS = -c -Wall -D _DEBUG -ggdb3 -std=c++17 -O0 -Wall -Wextra -Weffc++ -Wc++14
 
 BUILD_DIR = build
 
-PROC_DIR = tester
+PROC_DIR = proccessor
 ASM_DIR = asm
 COMMON_DIR = common
 
@@ -24,9 +24,9 @@ EXECUTABLE_DIR = $(BUILD_DIR)/executable
 PROC_EXEC = $(EXECUTABLE_DIR)/proc.exe
 ASM_EXEC = $(EXECUTABLE_DIR)/asm.exe
 
-.PHONY: all common proc asm
+.PHONY: all common proc asm make_common make_asm make_proc run compile
 
-all: clean proc asm
+all: proc asm
 
 proc: $(PROC_EXEC)
 	@echo Successfully remade $<
@@ -36,24 +36,33 @@ asm: $(ASM_EXEC)
 
 common: $(COMMON_OBJECTS)
 
-$(PROC_EXEC): $(COMMON_OBJECTS) $(PROC_OBJECTS)
-	@echo making $@
+$(PROC_EXEC): make_common make_proc
+	@echo --making $@--
 	@mkdir -p $(@D)
-	$(CC) $^ -o $@ $(LDFLAGS)
+	@$(CC) $(COMMON_OBJECTS) $(PROC_OBJECTS) -o $@ $(LDFLAGS)
 
-$(ASM_EXEC): $(COMMON_OBJECTS) $(ASM_OBJECTS)
-	@echo making $@
+$(ASM_EXEC): make_common make_asm
+	@echo --making $@--
 	@mkdir -p $(@D)
-	@$(CC) $^ -o $@ $(LDFLAGS)
+	@$(CC) $(COMMON_OBJECTS) $(ASM_OBJECTS) -o $@ $(LDFLAGS)
 
-$(COMMON_OBJECTS):
+make_common:
 	@echo $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)')
 
-$(PROC_OBJECTS):
+make_proc:
 	@echo $(shell $(MAKE) -s -C $(PROC_DIR) curr=$(PROC_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
 
-$(ASM_OBJECTS):
+make_asm:
 	@echo $(shell $(MAKE) -s -C $(ASM_DIR) curr=$(ASM_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
+
+
+run:
+	@./$(PROC_EXEC) -i code.txt
+
+compile:
+	@./$(ASM_EXEC) -i source_code.txt -o code.txt
+
+
 
 clean:
 	@rm -rf -d $(BUILD_DIR)

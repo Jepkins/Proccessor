@@ -15,8 +15,8 @@ LIB_INCS += -L ./$(CURRENT_DIR)/stack $(addprefix -l:, $(STACK_LIBS))
 SUBDIRS = $(wildcard */)
 
 SOURCES = $(wildcard $(addsuffix *.cpp, $(SUBDIRS)))
-OBJECTS = $(addprefix $(BUILD_DIR), $(SOURCES:.cpp=.o))
-DEPS = $(addsuffix .d, $(basename $(OBJECTS)))
+OBJECTS = $(addprefix $(BUILD_DIR)/, $(SOURCES:.cpp=.o))
+DEPS = $(addprefix ../, $(addsuffix .d, $(basename $(OBJECTS))))
 
 LOCAL_INCLUDES = $(addprefix -I, $(SUBDIRS))
 GLOBAL_INCLUDES = $(addprefix $(CURRENT_DIR)/, $(SUBDIRS))
@@ -26,8 +26,8 @@ all: $(addprefix ../, $(OBJECTS))
 
 -include $(DEPS)
 
-../$(BUILD_DIR)%.o: %.cpp
-	@echo making $(@:../%=%)
+../$(BUILD_DIR)/%.o: %.cpp
+	@echo --making $(@:../%=%)--
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) $< -o $@
 

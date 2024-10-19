@@ -1,26 +1,12 @@
 push 81
 sqrt
 push 9
-push 10
+push 36
 mul
 sqrt
 sub
-sin
-dub
-out
-sin
-dub
-out
-sin
-dub
-out
-sin
-dub
-out
-sin
-dub
-out
-sin
-dub
+in
+mul
+inv
 out
 hlt

@@ -9,16 +9,16 @@ INC_DIR = includes
 
 SOURCES = $(wildcard $(addsuffix *.cpp, $(SRC_DIR)/))
 OBJECTS = $(addprefix $(BUILD_DIR)/, $(SOURCES:.cpp=.o))
-DEPS = $(addsuffix .d, $(basename $(OBJECTS)))
+DEPS = $(addprefix ../, $(addsuffix .d, $(basename $(OBJECTS))))
 
 CFLAGS += $(addprefix -I, $(INC_DIR)) $(COMMON_INCLUDES)
 
--include $(DEPS)
-
 all: $(addprefix ../, $(OBJECTS))
 
+-include $(DEPS)
+
 ../$(BUILD_DIR)/%.o: %.cpp
-	@echo making $(@:../%=%)
+	@echo --making $(@:../%=%)--
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) $< -o $@
 
