@@ -27,7 +27,7 @@ typedef struct {
 #define _DBG(...)
 #define IF_DO_CANARY(...)
 #define IF_DO_HASH(...)
-#define _STACK_ASSERT_(stk)
+#define _STACK_ASSERT_(stk) if (stack_err(stk)) assert(0 && "stack_error");
 #endif
 
 typedef enum {
@@ -44,16 +44,17 @@ typedef enum {
     REALLOC_NULL    = 8
 } stack_err_t;
 
-static const size_t STACK_DEFAULT_CAP = 16;
+static const size_t DEFAULT_CAP = 16;
 
-stack_t* stack_new (size_t elm_width, size_t base_capacity = STACK_DEFAULT_CAP);
+stack_t* stack_new (size_t elm_width, size_t base_capacity = DEFAULT_CAP);
 void stack_delete (stack_t* stk);
 
 stack_err_t stack_err (stack_t* stk);
 
 void stack_dump(stack_t* stk, code_position_t pos = {"unknown", 0, "unknown"});
-void stack_assert (stack_t* stk, code_position_t pos);
+void stack_assert (stack_t* stk, code_position_t pos = {"unknown", 0, "unknown"});
 
+size_t stack_curr_size (stack_t* stk);
 void stack_push (stack_t* stk, const void* value);
 void stack_pop (stack_t* stk, void* dst);
 

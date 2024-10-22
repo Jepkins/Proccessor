@@ -1,11 +1,11 @@
 CC = g++
 CFLAGS = -c -Wall -D _DEBUG -ggdb3 -std=c++17 -O0 -Wall -Wextra -Weffc++ -Wc++14-compat -Wmissing-declarations -Wcast-align -Wcast-qual\
--Wchar-subscripts -Wconversion -Wctor-dtor-privacy -Wempty-body -Wfloat-equal -Wformat-nonliteral -Wformat-security -Wformat=2 -Winline\
+-Wchar-subscripts -Wconversion -Wctor-dtor-privacy -Wempty-body -Wformat-nonliteral -Wformat-security -Wformat=2 -Winline\
 -Wnon-virtual-dtor -Woverloaded-virtual -Wpacked -Wpointer-arith -Winit-self -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo\
 -Wstrict-overflow=2 -Wsuggest-override -Wswitch-default -Wundef -Wunreachable-code -Wunused -Wvariadic-macros\
--Wno-missing-field-initializers -Wno-narrowing -Wno-old-style-cast -Wno-varargs -Wstack-protector -Wsuggest-override\
+-Wno-missing-field-initializers -Wno-narrowing -Wno-old-style-cast -Wno-varargs -Wsuggest-override\
 -Wlong-long -fopenmp -fcheck-new -fsized-deallocation -fstack-protector -fstrict-overflow -fno-omit-frame-pointer\
--Wlarger-than=8192 -Wstack-protector -fPIE -Werror=vla -MP -MMD
+-Wlarger-than=8192 -fPIE -Werror=vla -MP -MMD
 
 BUILD_DIR = build
 
@@ -57,10 +57,10 @@ make_asm:
 
 
 run:
-	@./$(PROC_EXEC) -i code.txt
+	./$(PROC_EXEC) -i code.bin
 
 compile:
-	@./$(ASM_EXEC) -i source_code.txt -o code.txt
+	./$(ASM_EXEC) -i source_code.txt -o code.bin
 
 
 

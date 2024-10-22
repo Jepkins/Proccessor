@@ -124,6 +124,7 @@ void dynarr_push (dynarr_t* arr, const void* value, size_t n_of_elms)
 
 void dynarr_getdata (dynarr_t* arr, size_t index, void* dst, size_t n_of_elms)
 {
+    assert(arr && "dynarr_see(): arr = nullptr!!!!!");
     assert(dst && "dynarr_getdata(): dst = nullptr!!!!!");
 
     if (index + n_of_elms > arr->size)
@@ -131,7 +132,18 @@ void dynarr_getdata (dynarr_t* arr, size_t index, void* dst, size_t n_of_elms)
         printf("dynarr_getdata(): Out of boundaries: size = %lu, index = %lu, n_of_elms = %lu\n", arr->size, index, n_of_elms);
         return;
     }
-    memcpy(dst, (char*)arr->data + index, arr->elm_width*n_of_elms);
+    memcpy(dst, (char*)arr->data + index * arr->elm_width, arr->elm_width*n_of_elms);
+}
+void* dynarr_see (dynarr_t* arr, size_t index)
+{
+    assert(arr && "dynarr_see(): arr = nullptr!!!!!");
+
+    if (index >= arr->size)
+    {
+        printf("dynarr_see(): Out of boundaries: size = %lu, index = %lu\n", arr->size, index);
+        return nullptr;
+    }
+    return (char*)arr->data + index * arr->elm_width;
 }
 
 size_t dynarr_curr_size (dynarr_t* arr)

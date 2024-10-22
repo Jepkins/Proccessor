@@ -23,6 +23,7 @@ void dynarr_delete (dynarr_t* arr);
 void dynarr_push (dynarr_t* arr, const void* value, size_t n_of_elms = 1);
 
 void dynarr_getdata (dynarr_t* arr, size_t index, void* dst, size_t n_of_elms = 1);
+void* dynarr_see (dynarr_t* arr, size_t index);
 size_t dynarr_curr_size (dynarr_t* arr);
 
 void dynarr_dump (dynarr_t* arr, code_position_t pos);

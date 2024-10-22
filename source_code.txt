@@ -1,12 +1,14 @@
+
+:mark
+push 9+BX
+dub
+out
+dub
+pop BX
 push 81
-sqrt
-push 9
-push 36
-mul
-sqrt
-sub
-in
-mul
-inv
+ja :mark
+jmp :end
+:end
+push 0
 out
 hlt

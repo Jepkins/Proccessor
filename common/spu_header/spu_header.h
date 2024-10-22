@@ -1,9 +1,17 @@
-#ifndef PROCCESSROR_H
-#define PROCCESSROR_H
+#ifndef SPU_HEADER_H
+#define SPU_HEADER_H
 
 #include "cpp_preprocessor_logic.h"
 
+typedef struct {
+    char signature[16] = "Jepkins";
+    double version = 2.0;
+    size_t code_size = 0;
+} spu_header_t;
+
 #define PROC_CMD_LIST \
+/*  code  name    */\
+/*  |     |       */\
     0xff, unknown,  \
     0x00, hlt,      \
     0x01, push,     \
@@ -30,6 +38,8 @@
     TERMINATOR
 
 #define PROC_REGS_LIST \
+/*  ind name  */\
+/*  |   |     */\
     1,  AX,     \
     2,  BX,     \
     3,  CX,     \
@@ -48,15 +58,22 @@
     TERMINATOR
 
 typedef short cmd_code_t;
-typedef int elm_t;
-#define ELM_T_FORMAT "%d"
+typedef size_t elm_t;
+#define ELM_T_FORMAT "%lu"
 #define CMD_CODE_FORMAT "%4hX"
 
-static const size_t proc_regs_number = 16;
-static const size_t proc_ram_size = 1024;
+static const cmd_code_t SECOND_BYTE_MASK = (cmd_code_t)0xFF00;
+static const cmd_code_t LAST_BYTE_MASK   = (cmd_code_t)0x00FF;
+static const cmd_code_t IMMEDIATE_MASK   = (cmd_code_t)0x0100;
+static const cmd_code_t REGISTER_MASK    = (cmd_code_t)0x0200;
+static const cmd_code_t RAM_MASK         = (cmd_code_t)0x0400;
+
+#define MAX_ARGS_NUMBER 2
+static const size_t PROC_REGS_NUMBER = 16;
+static const size_t PROC_RAM_SIZE = 1024;
 
 typedef struct {
-    const char code;
+    const cmd_code_t code;
     const char name[10];
 } command_t;
 
@@ -64,15 +81,15 @@ typedef struct {
 #define NOT_END_TERMINATOR ~,1,
 #define DELETE_FIRST(a, ...) __VA_ARGS__
 
-#define COMMAND_STRUCT_PUSHEND(code, name, ...) __VA_ARGS__ , {(char) code, QUOTE(name)}
+#define COMMAND_STRUCT_PUSHEND(code, name, ...) __VA_ARGS__ , {(cmd_code_t) code, QUOTE(name)}
 static const command_t proc_commands_list[] = {
-    // Expands to [ {(char) 0xff, "unknown"}, {(char) 0x00, "hlt"}, ... ]
+    // Expands to [ {(cmd_code_t) 0xff, "unknown"}, {(cmd_code_t) 0x00, "hlt"}, ... ]
     EXPAND(DEFER(DELETE_FIRST)(WHILE(NOT_END, COMMAND_STRUCT_PUSHEND, PROC_CMD_LIST)))
 };
 
-#define COMMAND_ENUM_PUSHEND(code, name, ...) __VA_ARGS__ , PRIMITIVE_CAT(CMD_, name) = (char) code
+#define COMMAND_ENUM_PUSHEND(code, name, ...) __VA_ARGS__ , PRIMITIVE_CAT(CMD_, name) = (cmd_code_t) code
 enum commands_nums {
-    // Expands to [ CMD_unknown = (char) 0xff, CMD_hlt = (char) 0x00, ... ]
+    // Expands to [ CMD_unknown = (cmd_code_t) 0xff, CMD_hlt = (cmd_code_t) 0x00, ... ]
     EXPAND(DEFER(DELETE_FIRST)(WHILE(NOT_END, COMMAND_ENUM_PUSHEND, PROC_CMD_LIST)))
 };
 
@@ -90,8 +107,8 @@ static const registers_t proc_registers_list[] = {
 #define REGISTER_ENUM_PUSHEND(ind, name, ...) __VA_ARGS__ , PRIMITIVE_CAT(REG_, name) = (char) ind
 enum reg_num_t {
     // + REG_ZERO (do not touch)
-    // Expands to [ REG_AX = (char) 1, REG_BX = (char) 2, ... ]
+    // Expands to [ REG_AX = (cmd_code_t) 1, REG_BX = (cmd_code_t) 2, ... ]
     EXPAND(DEFER(DELETE_FIRST)(WHILE(NOT_END, REGISTER_ENUM_PUSHEND, PROC_REGS_LIST)))
 };
 
-#endif // PROCCESSROR_H
+#endif // SPU_HEADER_H

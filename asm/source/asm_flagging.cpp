@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-bool asm_setup(int argc, char** argv, StartConfig* run_conds)
+bool asmblr_setup(int argc, char** argv, StartConfig* run_conds)
 {
     const char* optstring = " -i: -o: --input_f: --output_f: ";
     // !!! always starts and ends with ' ', short options must be before long ones, do not use ':' in option names
@@ -17,7 +17,7 @@ bool asm_setup(int argc, char** argv, StartConfig* run_conds)
         if (!check_opt_flag(opt_flag, opt_out))
             run_conds->flagging_error = 1;
         else
-            asm_opt_proccessor(opt_out, run_conds);
+            asmblr_opt_proccessor(opt_out, run_conds);
     }
 
     if (run_conds->flagging_error)
@@ -26,7 +26,7 @@ bool asm_setup(int argc, char** argv, StartConfig* run_conds)
     return 1;
 }
 
-bool asm_opt_proccessor (getopt_out opt_out, StartConfig *run_conds)
+bool asmblr_opt_proccessor (getopt_out opt_out, StartConfig *run_conds)
 {
     if (!strcmp(opt_out.opt, "-i") || !strcmp(opt_out.opt, "--input_f"))
     {
