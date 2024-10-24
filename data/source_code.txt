@@ -1,0 +1,4 @@
+jmp :mark
+:mark ; cool
+push 5
+hlt

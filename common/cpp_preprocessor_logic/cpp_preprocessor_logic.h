@@ -4,6 +4,12 @@
 #define EMPTY()
 #define DEFER(id) id EMPTY()
 #define OBSTRUCT(id) id DEFER(EMPTY)()
+
+#define EXPAND5(...) EXPAND4(EXPAND4(EXPAND4(__VA_ARGS__)))
+#define EXPAND4(...) EXPAND3(EXPAND3(EXPAND3(__VA_ARGS__)))
+#define EXPAND3(...) EXPAND2(EXPAND2(EXPAND2(__VA_ARGS__)))
+#define EXPAND2(...) EXPAND1(EXPAND1(EXPAND1(__VA_ARGS__)))
+#define EXPAND1(...) EXPAND(EXPAND(EXPAND(__VA_ARGS__)))
 #define EXPAND(...) __VA_ARGS__
 
 #define Q(...) #__VA_ARGS__
@@ -30,25 +36,25 @@
 
 #define IF(c) IIF(BOOL(c))
 
-#define WHILE_NO_EXP(pred, op, ...)          \
-    IF(pred(__VA_ARGS__))             \
-    (                                 \
-        OBSTRUCT(WHILE_INDIRECT)()    \
-        (                             \
-            pred, op, op(__VA_ARGS__) \
-        ),                            \
-        __VA_ARGS__                   \
+#define WHILE_NO_EXP(pred, op, ...)     \
+    IF(pred(__VA_ARGS__))               \
+    (                                   \
+        OBSTRUCT(WHILE_INDIRECT)()      \
+        (                               \
+            pred, op, op(__VA_ARGS__)   \
+        ),                              \
+        __VA_ARGS__                     \
     )
 #define WHILE_INDIRECT() WHILE_NO_EXP
 
-#define WHILE(...) EVAL(WHILE_NO_EXP(__VA_ARGS__))
+#define WHILE(...) EXPAND3(WHILE_NO_EXP(__VA_ARGS__))
 
-#define EVAL(...)  EVAL1(EVAL1(EVAL1(__VA_ARGS__)))
-#define EVAL1(...) EVAL2(EVAL2(EVAL2(__VA_ARGS__)))
-#define EVAL2(...) EVAL3(EVAL3(EVAL3(__VA_ARGS__)))
-#define EVAL3(...) EVAL4(EVAL4(EVAL4(__VA_ARGS__)))
-#define EVAL4(...) EVAL5(EVAL5(EVAL5(__VA_ARGS__)))
-#define EVAL5(...) __VA_ARGS__
+#define NOT_END(t, ...) NOT(CHECK(CAT(NOT_END_, t)))
+#define NOT_END_TERMINATOR ~,1,
+#define DELETE_FIRST_1(a, ...) __VA_ARGS__
+#define DELETE_FIRST_2(a, ...) DELETE_FIRST_1(__VA_ARGS__)
+#define DELETE_FIRST_3(a, ...) DELETE_FIRST_2(__VA_ARGS__)
+#define DELETE_FIRST_4(a, ...) DELETE_FIRST_3(__VA_ARGS__)
 
 // #define MINUS_MINUS(x) CHECK(PRIMITIVE_CAT(MINUS_MINUS_, x))
 // #define MINUS_MINUS_1  ~,0,

@@ -55,12 +55,13 @@ make_proc:
 make_asm:
 	@echo $(shell $(MAKE) -s -C $(ASM_DIR) curr=$(ASM_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
 
-
+code ?= data/code.bin
+source ?= data/source_code.txt
 run:
-	./$(PROC_EXEC) -i code.bin
+	./$(PROC_EXEC) -i $(code)
 
 compile:
-	./$(ASM_EXEC) -i source_code.txt -o code.bin
+	./$(ASM_EXEC) -i $(source) -o $(code)
 
 
 

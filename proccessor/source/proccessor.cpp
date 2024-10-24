@@ -147,17 +147,17 @@ static bool check_header (spu_header_t* head)
 }
 
 
-#define PROC_EXECUTE_CASES_PUSHEND(code, name, ...) __VA_ARGS__ case code: {PRIMITIVE_CAT(proc_execute_, name)(proc); break;}
+#define PROC_EXECUTE_CASES_PUSHEND(code, name, args, ...) __VA_ARGS__ case code: {CAT(proc_execute_, name)(proc); break;}
 cmd_code_t proc_execute_next(proc_t* proc)
 {
     proc_getfullcmd(proc);
-
+// printf("currcmd = %hX, arg = " ELM_T_FORMAT "\n", proc->current_cmd.cmd_code, *proc->current_cmd.arg_ptr);
     switch (proc->current_cmd.cmd_code & LAST_BYTE_MASK)
     {
     // Expands to  case 0xff: {proc_execute_unknown(proc); break;}
     //             case 0x00: {proc_execute_hlt(proc); break;}
     //                               ...
-    EXPAND(DEFER(DELETE_FIRST)(WHILE(NOT_END, PROC_EXECUTE_CASES_PUSHEND, PROC_CMD_LIST, )))
+    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PROC_EXECUTE_CASES_PUSHEND, PROC_CMD_LIST, )))
     default:
     {
         printf("Unknown command: " CMD_CODE_FORMAT "\n", proc->current_cmd.cmd_code);
@@ -166,6 +166,8 @@ cmd_code_t proc_execute_next(proc_t* proc)
     }
     return proc->current_cmd.cmd_code;
 }
+#undef PROC_EXECUTE_CASES_PUSHEND
+
 static void proc_getfullcmd (proc_t* proc)
 {
     memcpy(&proc->current_cmd.cmd_code, proc->code + proc->ip, sizeof(proc->current_cmd.cmd_code));
@@ -177,6 +179,14 @@ static elm_t* proc_getarg (proc_t* proc, cmd_code_t cmd)
 {
     elm_t value = 0;
     size_t ind = 0;
+
+    if (cmd & INDEX_MASK)
+    {
+        memcpy(&ind, proc->code + proc->ip, sizeof(ind));
+        proc->ip += sizeof(ind);
+        proc->regs[0] = (elm_t)ind;
+        return &proc->regs[0];
+    }
     bool imd_met = false, reg_met = false;
     if ((imd_met = cmd & IMMEDIATE_MASK))
     {
@@ -207,9 +217,17 @@ static elm_t* proc_getarg (proc_t* proc, cmd_code_t cmd)
     }
 }
 
+/*================================================================================================================================*/
+
+#define ARG_ *(proc->current_cmd.arg_ptr)
+#define CMD_ proc->current_cmd.cmd_code
+#define POP_(elm)  elm_t elm = 0; stack_pop(proc->stk, &elm);
+#define PUSH_(elm) stack_push(proc->stk, &elm);
+
+
 static void proc_execute_unknown(proc_t* proc)
 {
-    printf("Unknown command: " CMD_CODE_FORMAT "\n", proc->current_cmd.cmd_code);
+    printf("Unknown command: " CMD_CODE_FORMAT "\n", CMD_);
     assert(0 && "Unknown command");
 }
 static void proc_execute_hlt(proc_t* proc)
@@ -219,138 +237,140 @@ static void proc_execute_hlt(proc_t* proc)
 }
 
 // START: JUMPS
+#define POP_POP(elm_new, elm_old)       \
+    POP_(elm_new)                       \
+    POP_(elm_old)
+
 static void proc_execute_jmp(proc_t* proc)
 {
-    proc->ip = (size_t)*(proc->current_cmd.arg_ptr);
+    proc->ip = (size_t)ARG_;
 }
 static void proc_execute_ja(proc_t* proc)
 {
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    if (newer_elm > older_elm)
-        proc->ip = (size_t)*(proc->current_cmd.arg_ptr);
+    POP_POP(elm_new, elm_old)
+    if (elm_new > elm_old)
+        proc->ip = (size_t)ARG_;
 }
 static void proc_execute_jae(proc_t* proc)
 {
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    if (newer_elm >= older_elm)
-        proc->ip = (size_t)*(proc->current_cmd.arg_ptr);
+    POP_POP(elm_new, elm_old)
+    if (elm_new >= elm_old)
+        proc->ip = (size_t)ARG_;
 }
 static void proc_execute_jb(proc_t* proc)
 {
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    if (newer_elm < older_elm)
-        proc->ip = (size_t)*(proc->current_cmd.arg_ptr);
+    POP_POP(elm_new, elm_old)
+    if (elm_new < elm_old)
+        proc->ip = (size_t)ARG_;
 }
 static void proc_execute_jbe(proc_t* proc)
 {
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    if (newer_elm <= older_elm)
-        proc->ip = (size_t)*(proc->current_cmd.arg_ptr);
+    POP_POP(elm_new, elm_old)
+    if (elm_new <= elm_old)
+        proc->ip = (size_t)ARG_;
 }
 static void proc_execute_je(proc_t* proc)
 {
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    if (newer_elm == older_elm)
-        proc->ip = (size_t)*(proc->current_cmd.arg_ptr);
+    POP_POP(elm_new, elm_old)
+    if (elm_new == elm_old)
+        proc->ip = (size_t)ARG_;
 }
 static void proc_execute_jne(proc_t* proc)
 {
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    if (newer_elm != older_elm)
-        proc->ip = (size_t)*(proc->current_cmd.arg_ptr);
+    POP_POP(elm_new, elm_old)
+    if (elm_new != elm_old)
+        proc->ip = (size_t)ARG_;
 }
+
+#undef POP_POP
 // END: JUMPS
+
+// START: FUNCS
+static void proc_execute_call(proc_t* proc)
+{
+    size_t ip_next = proc->ip;
+    stack_push(proc->return_ips, &ip_next);
+    proc->ip = (size_t)ARG_;
+}
+static void proc_execute_ret(proc_t* proc)
+{
+    size_t ret_ip = 0;
+    stack_pop(proc->return_ips, &ret_ip);
+    proc->ip = ret_ip;
+}
+// END: FUNCS
 
 static void proc_execute_push(proc_t* proc)
 {
-    stack_push(proc->stk, proc->current_cmd.arg_ptr);
+    PUSH_(ARG_)
 }
 static void proc_execute_pop(proc_t* proc)
 {
-    stack_pop(proc->stk, proc->current_cmd.arg_ptr);
+    stack_pop(proc->stk, &ARG_);
 }
 
 // START: UNARY
+
+#define POP_PUSH(elm, oper)             \
+    POP_(elm)                           \
+    elm_t res = oper;                   \
+    PUSH_(res)
+
 static void proc_execute_inv (proc_t* proc)
 {
-    elm_t elm = 0;
-    stack_pop(proc->stk, &elm);
-    elm = -elm;
-    stack_push(proc->stk, &elm);
+    POP_PUSH(elm, -elm)
 }
 static void proc_execute_dub (proc_t* proc)
 {
-    elm_t elm = 0;
-    stack_pop(proc->stk, &elm);
-    stack_push(proc->stk, &elm);
-    stack_push(proc->stk, &elm);
-}
-static void proc_execute_add (proc_t* proc)
-{
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    older_elm += newer_elm;
-    stack_push(proc->stk, &older_elm);
-}
-static void proc_execute_sub (proc_t* proc)
-{
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    older_elm -= newer_elm;
-    stack_push(proc->stk, &older_elm);
-}
-static void proc_execute_mul (proc_t* proc)
-{
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    older_elm *= newer_elm;
-    stack_push(proc->stk, &older_elm);
-}
-static void proc_execute_div (proc_t* proc)
-{
-    elm_t newer_elm = 0, older_elm = 0;
-    stack_pop(proc->stk, &newer_elm);
-    stack_pop(proc->stk, &older_elm);
-    older_elm /= newer_elm;
-    stack_push(proc->stk, &older_elm);
+    POP_(elm)
+    PUSH_(elm)
+    PUSH_(elm)
 }
 static void proc_execute_sqrt(proc_t* proc)
 {
-    elm_t elm = 0;
-    stack_pop(proc->stk, &elm);
-    elm = (elm_t)sqrt((double)elm);
-    stack_push(proc->stk, &elm);
+    POP_PUSH(elm, (elm_t)sqrt((double)elm))
 }
 static void proc_execute_sin (proc_t* proc)
 {
-    elm_t elm = 0;
-    stack_pop(proc->stk, &elm);
-    elm = (elm_t)sin((double)elm);
-    stack_push(proc->stk, &elm);
+    POP_PUSH(elm, (elm_t)sin((double)elm))
 }
 static void proc_execute_cos (proc_t* proc)
 {
-    elm_t elm = 0;
-    stack_pop(proc->stk, &elm);
-    elm = (elm_t)cos((double)elm);
-    stack_push(proc->stk, &elm);
+    POP_PUSH(elm, (elm_t)cos((double)elm))
 }
+
+#undef POP_PUSH
+
 // END: UNARY
+
+// START: BIARG
+
+#define POP_POP_PUSH(elm_new, elm_old, oper)    \
+    POP_(elm_new)                               \
+    POP_(elm_old)                               \
+    elm_t res = oper;                           \
+    PUSH_(res)
+
+static void proc_execute_add (proc_t* proc)
+{
+    POP_POP_PUSH(elm_new, elm_old, elm_old + elm_new)
+}
+static void proc_execute_sub (proc_t* proc)
+{
+    POP_POP_PUSH(elm_new, elm_old, elm_old - elm_new)
+}
+static void proc_execute_mul (proc_t* proc)
+{
+    POP_POP_PUSH(elm_new, elm_old, elm_old * elm_new)
+}
+static void proc_execute_div (proc_t* proc)
+{
+    POP_POP_PUSH(elm_new, elm_old, elm_old / elm_new)
+}
+
+#undef POP_POP_PUSH
+
+// END: BIARG
 
 // START: iostreams
 static void proc_execute_out (proc_t* proc)
@@ -370,10 +390,17 @@ static void proc_execute_dump(proc_t* proc)
 {
     fprintf(stderr, "PROC_DUMP:\n");
     fprintf(stderr, "ip = %lu\n", proc->ip);
-    //dynarr_dump(proc->code, _POS_);
+    // FUCK: code dump, RAM dump
     stack_dump(proc->stk, _POS_);
     fprintf(stderr, "regs: [ ");
     for (size_t i = 0; i < PROC_REGS_NUMBER; i++) fprintf(stderr, "|%2lu: " ELM_T_FORMAT "| ", i, proc->regs[i]);
     fprintf(stderr, "]\n");
 }
 // END: iostreams
+
+#undef ARG_
+#undef CMD_
+#undef POP_
+#undef PUSH_
+
+/*=================================================================================================================*/

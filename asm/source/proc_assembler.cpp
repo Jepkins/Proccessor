@@ -58,6 +58,8 @@ int main(int argc, char** argv)
     return 0;
 }
 
+#define ERRMSG(msg, ... /* param */) printf("[%3lu]" msg "\n", asmblr->ip, __VA_ARGS__)
+
 static void translate (const char* dst_filename, const char* src_filename)
 {
     asmblr_state_t* asmblr = asmblr_state_new();
@@ -76,10 +78,14 @@ static void translate (const char* dst_filename, const char* src_filename)
         char cmd_word[MAXWRDLEN] = {0};
         if(!fscanf(src, "%" QUOTE(MAXWRDLEN) "s",  cmd_word))
             break;
-
-printf("caught %s\n", cmd_word);
         if (strcmp(cmd_word, "") == 0)
             break;
+
+        if (strcmp(cmd_word, ";") == 0)
+        {
+            skip_line(src);
+            continue;
+        }
         if (cmd_word[0] == ':')
         {
             if(!add_mark(asmblr, cmd_word, asmblr->ip))
@@ -91,34 +97,20 @@ printf("caught %s\n", cmd_word);
         cmd_code_t cmd_code = get_cmd_code(cmd_word);
         if ((cmd_code & LAST_BYTE_MASK) == CMD_unknown)
         {
-            printf("Syntax error (unknown command): %s\n", cmd_word);
+            ERRMSG("Syntax error (unknown command): %s", cmd_word);
             error_met = true;
             continue;
         }
 
-        args_t args = {};
-
         switch (cmd_code & LAST_BYTE_MASK)
         {
-        case CMD_push:
-        case CMD_pop:
-        {
-            char argword[MAXWRDLEN] = {};
-            fscanf(src, "%s", argword);
-            if (!parse_arg_push_pop(&cmd_code, &args, argword))
-            {
-                error_met = true;
-                continue;
-            }
-            break;
-        }
-        CASE_JUMP
+        CASE_JUMP_CALL
         (
-            cmd_code = cmd_code ^ IMMEDIATE_MASK;
+            cmd_code = cmd_code ^ INDEX_MASK;
             char jump_mark[MAXWRDLEN] = {};
             if (!fscanf(src, "%" QUOTE(MAXWRDLEN) "s", jump_mark) || jump_mark[0] != ':')
             {
-                printf("Expected mark after %s\n", cmd_word);
+                ERRMSG("Expected mark after %s", cmd_word);
                 error_met = true;
                 continue;
             }
@@ -134,57 +126,69 @@ printf("caught %s\n", cmd_word);
             {
                 fixup_t new_fixup = {mark_ind, asmblr->ip + sizeof(cmd_code)};
                 stack_push(asmblr->fixups, &new_fixup);
-                args.val = (elm_t)-1;
             }
-            else
-            {
-                args.val = (elm_t)mark_ip;
-            }
+            asmblr->ip += sizeof(cmd_code);
+            dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
+            asmblr->ip += sizeof(mark_ip);
+            dynarr_push(asmblr->code, &mark_ip, sizeof(mark_ip));
             break;
         )
         default:
         {
-            break;
+            args_t args = {};
+            if (!parse_arg(asmblr, &cmd_code, &args, src))
+            {
+                error_met = true;
+                continue;
+            }
+            asmblr->ip += sizeof(cmd_code);
+            dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
+            if (cmd_code & IMMEDIATE_MASK)
+            {
+                asmblr->ip += sizeof(args.val);
+                dynarr_push(asmblr->code, &args.val, sizeof(args.val));
+            }
+            if (cmd_code &  REGISTER_MASK)
+            {
+                asmblr->ip += sizeof(args.ind);
+                dynarr_push(asmblr->code, &args.ind, sizeof(args.ind));
+            }
         }
-        }
-
-        asmblr->ip += sizeof(cmd_code);
-        dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
-        if (cmd_code & IMMEDIATE_MASK)
-        {
-            asmblr->ip += sizeof(args.val);
-            dynarr_push(asmblr->code, &args.val, sizeof(args.val));
-        }
-        if (cmd_code &  REGISTER_MASK)
-        {
-            asmblr->ip += sizeof(args.ind);
-            dynarr_push(asmblr->code, &args.ind, sizeof(args.ind));
         }
     }
     fclose(src);
 
+    if (!execute_fixup(asmblr))
+    {
+        error_met = true;
+    }
     if (error_met)
     {
         printf("Error, break\n");
         asmblr_state_delete(asmblr);
         return;
     }
-    if (execute_fixup(asmblr))
-    {
-        write_code(dst_filename, asmblr->code);
-    }
+    write_code(dst_filename, asmblr->code);
     asmblr_state_delete(asmblr);
 }
+static void skip_line(FILE* src)
+{
+    int c;
+    do {
+        c = fgetc(src);
+    } while(c != '\n' && c != EOF);
+}
 
-#define ASMBLR_SEE_CMD_IF_PUSHEND(code, name, ...) __VA_ARGS__ if(strcmp(cmd_word, QUOTE(name)) == 0) {return (PRIMITIVE_CAT(CMD_, name) & LAST_BYTE_MASK);}
+#define ASMBLR_STRCMP_PUSHEND(code, name, args, ...) __VA_ARGS__ if(strcmp(cmd_word, QUOTE(name)) == 0) {return (CAT(CMD_, name) & LAST_BYTE_MASK);}
 static cmd_code_t get_cmd_code(const char* cmd_word)
 {
     // Expands to   if(strcmp(cmd_word, "unknown") == 0) return (CMD_unknown & LAST_BYTE_MASK);
     //              if(strcmp(cmd_word, "hlt") == 0) return (CMD_hlt & LAST_BYTE_MASK);
     //                                    ...
-    EXPAND(DEFER(DELETE_FIRST)(WHILE(NOT_END, ASMBLR_SEE_CMD_IF_PUSHEND, PROC_CMD_LIST, )))
+    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, ASMBLR_STRCMP_PUSHEND, PROC_CMD_LIST, )))
     return (CMD_unknown & LAST_BYTE_MASK);
 }
+#undef ASMBLR_STRCMP_PUSHEND
 
 static bool add_mark(asmblr_state_t* asmblr, char* name, size_t ip)
 {
@@ -200,7 +204,7 @@ static bool add_mark(asmblr_state_t* asmblr, char* name, size_t ip)
     {
         if (((mark_t*)dynarr_see(asmblr->marks, i))->ip != (size_t)-1)
         {
-            printf("Multiple mark definition: %s\n", ((mark_t*)dynarr_see(asmblr->marks, i))->name);
+            ERRMSG("Multiple mark definition: %s", ((mark_t*)dynarr_see(asmblr->marks, i))->name);
             return 0;
         }
         else
@@ -226,10 +230,30 @@ static size_t find_mark(asmblr_state_t* asmblr, const char* name)
     return i;
 }
 
-#define PARSE_ARG_PUSH_POP_IF_PUSHEND(index, name, ...) __VA_ARGS__ if(strcmp(reg, QUOTE(name)) == 0) {args->ind = index; continue;}
+#define PARSE_ARG_PUSH_POP_IF_PUSHEND(index, name, ...) __VA_ARGS__             \
+    if(strcmp(reg, QUOTE(name)) == 0)                                           \
+    {                                                                           \
+        if (reg_met)                                                            \
+        {                                                                       \
+            ERRMSG("Multiple registers: %s", argword);                          \
+            return 0;                                                           \
+        }                                                                       \
+        reg_met = true;                                                         \
+        plus = false;                                                           \
+        i += 2;                                                                 \
+        args->ind = index;                                                      \
+        continue;                                                               \
+    }
 
-static bool parse_arg_push_pop(cmd_code_t* cmd_code, args_t* args, char* argword)
+static bool parse_arg(asmblr_state_t* asmblr, cmd_code_t* cmd_code, args_t* args, FILE* src)
 {
+    unsigned char poss_args = get_possible_args(*cmd_code);
+    assert(poss_args && "invalid cmd_code");
+    if (poss_args == 0x01)
+        return 1;
+
+    char argword[MAXWRDLEN] = {};
+    fscanf(src, "%s", argword);
     size_t len = strlen(argword);
     assert(len != 0 && "invalid argword");
     bool do_ram  = false;
@@ -241,26 +265,29 @@ static bool parse_arg_push_pop(cmd_code_t* cmd_code, args_t* args, char* argword
     {
         if (len < 2 || argword[len-1] != ']')
         {
-            printf("Expected ']': %s <- here\n", argword);
+            ERRMSG("Expected ']': %s <- here", argword);
             return 0;
         }
         do_ram = true;
-        len -= 2;
-        argword++;
+        len -= 1;
     }
-    for(size_t i = 0; i < len;)
+    for(size_t i = do_ram; i < len;)
     {
-        // printf("argword = %s\n", argword);
         if (argword[i] == '+')
         {
             if (plus)
             {
-                printf("Multiple '+': %s\n", argword);
+                ERRMSG("Multiple '+': %s", argword);
                 return 0;
             }
             plus = true;
             i++;
             continue;
+        }
+        if (!plus)
+        {
+            ERRMSG("Use '+': %s", argword);
+            return 0;
         }
 
         int scan_n = 0;
@@ -269,12 +296,13 @@ static bool parse_arg_push_pop(cmd_code_t* cmd_code, args_t* args, char* argword
         {
             if (imd_met)
             {
-                printf("Multiple imediate arguments: %s\n", argword);
+                ERRMSG("Multiple immediate arguments: %s", argword);
                 return 0;
             }
             if (!plus)
             {
-                printf("Use '+': %s\n", argword);
+                ERRMSG("Use '+': %s", argword);
+                return 0;
             }
             else
             {
@@ -285,42 +313,54 @@ static bool parse_arg_push_pop(cmd_code_t* cmd_code, args_t* args, char* argword
             }
         }
 
-        if (reg_met)
-        {
-            printf("Multiple registers: %s\n", argword);
-            return 0;
-        }
-        if (!plus)
-        {
-            printf("Use '+': %s\n", argword);
-        }
-        reg_met = true;
-        plus = false;
         char reg[3] = {};
         sscanf(argword + i, "%2s", reg);
-        i += 2;
 
-        // Expands to   if(strcmp(reg, "AX") == 0) {args[1] = 0x01; continue;}
-        //              if(strcmp(reg, "BX") == 0) {args[1] = 0x02; continue;}
+        // Expands to   if(strcmp(reg, "AX") == 0) { ... continue;}
+        //              if(strcmp(reg, "BX") == 0) { ... continue;}
         //                                      ...
-        EXPAND(DEFER(DELETE_FIRST)(WHILE(NOT_END, PARSE_ARG_PUSH_POP_IF_PUSHEND, PROC_REGS_LIST, )))
+        EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PARSE_ARG_PUSH_POP_IF_PUSHEND, PROC_REGS_LIST, )))
 
-        printf("Invalid argument: %s\n", argword);
+        // Not an argument
+        break;
+    }
+
+    unsigned char read_arg = (unsigned char) (1 << (imd_met * 1) << (reg_met * 2) << (do_ram * 4));
+    if(!(read_arg & poss_args))
+    {
+        if (read_arg == 1)
+            ERRMSG("Expected argument before %s", argword);
+        else
+            ERRMSG("Invalid argument: %s", argword);
+    }
+
+    if (plus)
+    {
+        ERRMSG("Expected argument after '+': %s", argword);
         return 0;
     }
     if (imd_met) *cmd_code = *cmd_code ^ IMMEDIATE_MASK;
     if (reg_met) *cmd_code = *cmd_code ^ REGISTER_MASK;
     if (do_ram)  *cmd_code = *cmd_code ^ RAM_MASK;
 
-    if ((*cmd_code & LAST_BYTE_MASK) == CMD_pop &&
-        (( reg_met && imd_met && !do_ram) || (!reg_met && imd_met && !do_ram)))
-    {
-        printf("Invalid pop argument: %s\n", argword);
-        return 0;
-    }
-
     return 1;
 }
+#undef PARSE_ARG_PUSH_POP_IF_PUSHEND
+
+#define GET_POSS_ARGS_PUSHEND(code, name, args, ...) __VA_ARGS__ case code: {return args;}
+static unsigned char get_possible_args(cmd_code_t code)
+{
+    code = code & LAST_BYTE_MASK;
+    switch (code)
+    {
+        // Expands to  case 0xff: {return 0x00;}
+        //             case 0x00: {return 0x01;}
+        //                        ...
+        EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, GET_POSS_ARGS_PUSHEND, PROC_CMD_LIST, )))
+        default: return 0;
+    }
+}
+#undef GET_POSS_ARGS_PUSHEND
 
 static bool execute_fixup(asmblr_state_t* asmblr)
 {
@@ -335,7 +375,7 @@ static bool execute_fixup(asmblr_state_t* asmblr)
 
         if (fixed_ip == (size_t)-1)
         {
-            printf("Mark used but not defined: %s\n", mark->name);
+            ERRMSG("Mark used but not defined: %s", mark->name);
             return 0;
         }
         *(size_t*)dynarr_see(asmblr->code, fixup.ip) = fixed_ip;
@@ -358,3 +398,5 @@ static void write_code(const char* dst_filename, dynarr_t* code)
     fwrite(&head, sizeof(head), 1, dst);
     fwrite(dynarr_see(code, 0), sizeof(char) , code_size, dst);
 }
+
+#undef ERRMSG
