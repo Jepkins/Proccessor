@@ -59,9 +59,9 @@ int main(int argc, char** argv)
     return 0;
 }
 
-#define ERRMSG(msg, ... /* param */) printf("[%3lu]" msg "\n", asmblr->ip, __VA_ARGS__)
+#define ERRMSG(msg, ... /* param */) printf("[%lu]" msg "\n", asmblr->ip, __VA_ARGS__)
 
-static void translate (const char* dst_filename, const char* src_filename)
+static int translate (const char* dst_filename, const char* src_filename)
 {
     asmblr_state_t* asmblr = asmblr_state_new();
 
@@ -71,17 +71,17 @@ static void translate (const char* dst_filename, const char* src_filename)
     if (!src)
     {
         printf("Could not open file: %s\n", src_filename);
-        return;
+        return -1;
     }
 
     while (!feof(src))
     {
-        char cmd_word[MAXWRDLEN] = {0};
+        char cmd_word[MAXWRDLEN] = {};
         if(!fscanf(src, "%" QUOTE(MAXWRDLEN) "s",  cmd_word))
-            break;
-        if (strcmp(cmd_word, "") == 0)
-            break;
+            continue;
 
+        if (cmd_word[0] == '\0')
+            continue;
         if (cmd_word[0] == ';')
         {
             skip_line(src);
@@ -167,10 +167,16 @@ static void translate (const char* dst_filename, const char* src_filename)
     {
         printf("Error, break\n");
         asmblr_state_delete(asmblr);
-        return;
+        return 1;
+    }
+    if (dynarr_curr_size(asmblr->code) == 0)
+    {
+        printf("Empty code, break\n");
+        return 1;
     }
     write_code(dst_filename, asmblr->code);
     asmblr_state_delete(asmblr);
+    return 0;
 }
 static void skip_line(FILE* src)
 {
@@ -365,6 +371,8 @@ static unsigned char get_possible_args(cmd_code_t code)
 
 static bool execute_fixup(asmblr_state_t* asmblr)
 {
+    if (dynarr_curr_size(asmblr->code) == 0)
+        return 1;
     size_t n_of_fixups = stack_curr_size(asmblr->fixups);
     for (size_t i = 0; i < n_of_fixups; i++)
     {

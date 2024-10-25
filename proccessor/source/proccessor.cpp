@@ -82,21 +82,7 @@ int main(int argc, char** argv)
 
 static int proc_run(const char* code_filename)
 {
-
     proc_t* proc = proc_new(sizeof(elm_t));
-    if (run_conds.do_video)
-    {
-        if (PROC_RAM_SIZE < DRAW_WIDTH * DRAW_HEIGHT)
-        {
-            printf("Not enough ram to draw!!!\n");
-            run_conds.do_video = false;
-        }
-        else
-        {
-            proc->cnv = new MemCanvas;
-            proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, "RAM[]");
-        }
-    }
 
     size_t code_size = proc_load(code_filename, proc);
     if (code_size == (size_t)-1)
@@ -110,7 +96,6 @@ static int proc_run(const char* code_filename)
         cmd_code_t cmd = CMD_hlt;
         cmd = proc_execute_next(proc);
 
-        // printf(CMD_CODE_FORMAT " executed\n", cmd);
         if (cmd == CMD_hlt)
             break;
     }
@@ -124,6 +109,20 @@ static int proc_run(const char* code_filename)
 
 static size_t proc_load (const char* code_filename, proc_t* proc)
 {
+    if (run_conds.do_video)
+    {
+        if (PROC_RAM_SIZE * sizeof(elm_t) < DRAW_WIDTH * DRAW_HEIGHT * sizeof(pix_t))
+        {
+            printf("Not enough ram to draw!!!\n");
+            run_conds.do_video = false;
+        }
+        else
+        {
+            proc->cnv = new MemCanvas;
+            proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, "RAM[]");
+        }
+    }
+
     FILE* istream = fopen(code_filename, "rb");
     if (!istream)
     {
@@ -227,6 +226,7 @@ static elm_t* proc_getarg (proc_t* proc, cmd_code_t cmd)
     }
     if (cmd & RAM_MASK)
     {
+        assert((size_t)round(value) < PROC_RAM_SIZE && "RAM: out of boundaries");
         return &proc->ram[(size_t)round(value)];
     }
     else

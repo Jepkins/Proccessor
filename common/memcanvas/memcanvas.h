@@ -26,11 +26,11 @@ public:
     int Update();
 private:
     bool inited = false;
-    int width = 0;
+    int width =  0;
     int height = 0;
-    pix_t* pixs = nullptr;
-    SDL_Window *win = nullptr;
-    SDL_Surface *scr = nullptr;
+    pix_t*        pixs = nullptr;
+    SDL_Window    *win = nullptr;
+    SDL_Surface   *scr = nullptr;
     SDL_Renderer *rndr = nullptr;
 };
 

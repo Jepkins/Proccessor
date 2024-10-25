@@ -56,7 +56,7 @@ make_asm:
 	@echo $(shell $(MAKE) -s -C $(ASM_DIR) curr=$(ASM_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
 
 code ?= data/code.bin
-source ?= data/source_code.txt
+source ?= data/source_code.asm
 ifeq ($(d_vid), true)
 --video = --video
 endif

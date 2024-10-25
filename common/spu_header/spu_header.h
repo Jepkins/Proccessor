@@ -5,7 +5,7 @@
 
 typedef struct {
     char signature[16] = "Jepkins";
-    double version = 2.3;
+    double version = 2.4;
     size_t code_size = 0;
 } spu_header_t;
 
@@ -78,8 +78,8 @@ typedef struct {
     TERMINATOR
 
 typedef short cmd_code_t;
-typedef double elm_t;
-#define ELM_T_FORMAT "%lg"
+typedef int elm_t;
+#define ELM_T_FORMAT "%d"
 #define CMD_CODE_FORMAT "%4hX"
 
 static const cmd_code_t SECOND_BYTE_MASK = (cmd_code_t)0xFF00;
