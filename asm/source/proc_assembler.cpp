@@ -82,7 +82,7 @@ static void translate (const char* dst_filename, const char* src_filename)
         if (strcmp(cmd_word, "") == 0)
             break;
 
-        if (strcmp(cmd_word, ";") == 0)
+        if (cmd_word[0] == ';')
         {
             skip_line(src);
             continue;

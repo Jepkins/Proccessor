@@ -35,7 +35,9 @@ push 0
 jbe :validsqr
 call :non
 ret
+
 :validsqr
+
 push BB inv
 push DD sqrt
 sub

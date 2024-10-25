@@ -403,18 +403,20 @@ static void proc_execute_div (proc_t* proc)
 // END: BIARG
 
 // START: iostreams
+static void proc_execute_putcc (proc_t* proc)
+{
+    putc((int)ARG_, stdout);
+}
 static void proc_execute_out (proc_t* proc)
 {
-    elm_t value_to_print;
-    stack_pop(proc->stk, &value_to_print);
-    printf("out[%lu] = " ELM_T_FORMAT "\n", proc->ip, value_to_print);
+    POP_(value_to_print)
+    printf(ELM_T_FORMAT "\n", value_to_print);
 }
 static void proc_execute_in  (proc_t* proc)
 {
     elm_t value_to_scan = 0;
-    printf("Enter value: ");
     scanf(ELM_T_FORMAT, &value_to_scan);
-    stack_push(proc->stk, &value_to_scan);
+    PUSH_(value_to_scan);
 }
 static void proc_execute_dump(proc_t* proc)
 {

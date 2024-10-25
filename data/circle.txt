@@ -10,7 +10,7 @@ push 0 dub           ; for
 pop AX pop AY
 :loop0
 
-call :ifdraw ; checks AX, AY and ocasionally calls :setpnt
+call :ifdraw         ; checks AX, AY and ocasionally calls :setpnt
 
 :fordraw
 push AY+1 dub pop AY ; j++

@@ -42,6 +42,7 @@ typedef struct {
     0xD7, jne,     0x02,            \
     0xDA, call,    0x02,            \
     0xDB, ret,     0x01,            \
+    0xE0, putcc,   0xEE,            \
     0xE1, in,      0x01,            \
     0xE2, out,     0x01,            \
     0xE3, dump,    0x01,            \
@@ -69,12 +70,16 @@ typedef struct {
     16, RR,     \
     17, II,     \
     18, JJ,     \
-    19, CC,     \
+    19, AA,     \
+    20, BB,     \
+    21, CC,     \
+    22, DD,     \
+    23, EE,     \
     TERMINATOR
 
 typedef short cmd_code_t;
-typedef int elm_t;
-#define ELM_T_FORMAT "%d"
+typedef double elm_t;
+#define ELM_T_FORMAT "%lg"
 #define CMD_CODE_FORMAT "%4hX"
 
 static const cmd_code_t SECOND_BYTE_MASK = (cmd_code_t)0xFF00;

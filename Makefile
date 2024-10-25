@@ -57,8 +57,12 @@ make_asm:
 
 code ?= data/code.bin
 source ?= data/source_code.txt
+ifeq ($(d_vid), true)
+--video = --video
+endif
+
 run:
-	./$(PROC_EXEC) -i $(code) $(d_vid)
+	./$(PROC_EXEC) -i $(code) $(--video)
 
 compile:
 	./$(ASM_EXEC) -i $(source) -o $(code)
