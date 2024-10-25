@@ -2,12 +2,17 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <chrono>
+#include <thread>
 #include "proc_flagging.h"
 #include "spu_header.h"
 #include "processor.h"
 #include "stack.h"
 #include "dynarr.h"
 #include "cpp_preprocessor_logic.h"
+#include "memcanvas.h"
+
+static StartConfig run_conds;
 
 static proc_t* proc_new (size_t elm_size)
 {
@@ -66,25 +71,40 @@ static void proc_dtor (proc_t* proc)
 
 int main(int argc, char** argv)
 {
-    StartConfig run_conds;
     proc_setup(argc, argv, &run_conds);
 
-    proc_run(run_conds.input_file);
+    if (proc_run(run_conds.input_file) != 0)
+        return 1;
     printf("done\n");
     return 0;
 }
 
 
-static void proc_run(const char* code_filename)
+static int proc_run(const char* code_filename)
 {
+
     proc_t* proc = proc_new(sizeof(elm_t));
+    if (run_conds.do_video)
+    {
+        if (PROC_RAM_SIZE < DRAW_WIDTH * DRAW_HEIGHT)
+        {
+            printf("Not enough ram to draw!!!\n");
+            run_conds.do_video = false;
+        }
+        else
+        {
+            proc->cnv = new MemCanvas;
+            proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, "RAM[]");
+        }
+    }
 
     size_t code_size = proc_load(code_filename, proc);
     if (code_size == (size_t)-1)
     {
         printf("Failed to load. Break\n");
+        return 1;
     }
-
+    proc->code_size = code_size;
     while (proc->ip < code_size)
     {
         cmd_code_t cmd = CMD_hlt;
@@ -94,6 +114,12 @@ static void proc_run(const char* code_filename)
         if (cmd == CMD_hlt)
             break;
     }
+
+    if (run_conds.do_video)
+    {
+        proc->cnv->Quit();
+    }
+    return 0;
 }
 
 static size_t proc_load (const char* code_filename, proc_t* proc)
@@ -201,7 +227,7 @@ static elm_t* proc_getarg (proc_t* proc, cmd_code_t cmd)
     }
     if (cmd & RAM_MASK)
     {
-        return &proc->ram[value];
+        return &proc->ram[(size_t)round(value)];
     }
     else
     {
@@ -330,6 +356,10 @@ static void proc_execute_sqrt(proc_t* proc)
 {
     POP_PUSH(elm, (elm_t)sqrt((double)elm))
 }
+static void proc_execute_sqr(proc_t* proc)
+{
+    POP_PUSH(elm, elm*elm)
+}
 static void proc_execute_sin (proc_t* proc)
 {
     POP_PUSH(elm, (elm_t)sin((double)elm))
@@ -390,13 +420,40 @@ static void proc_execute_dump(proc_t* proc)
 {
     fprintf(stderr, "PROC_DUMP:\n");
     fprintf(stderr, "ip = %lu\n", proc->ip);
-    // FUCK: code dump, RAM dump
+    fprintf(stderr, "code: [ ");
+    for (size_t i = 0; i < proc->code_size; i++) fprintf(stderr, "|%2lu: %2X| ", i, proc->code[i]);
+    fprintf(stderr, "]\n");
+    fprintf(stderr, "ram: [ ");
+    for (size_t i = 0; i < PROC_RAM_SIZE; i++) fprintf(stderr, "|%2lu: " ELM_T_FORMAT "| ", i, proc->ram[i]);
+    fprintf(stderr, "]\n");
     stack_dump(proc->stk, _POS_);
     fprintf(stderr, "regs: [ ");
     for (size_t i = 0; i < PROC_REGS_NUMBER; i++) fprintf(stderr, "|%2lu: " ELM_T_FORMAT "| ", i, proc->regs[i]);
     fprintf(stderr, "]\n");
 }
 // END: iostreams
+
+// START: MISC
+static void proc_execute_draw  (proc_t* proc)
+{
+    if (!run_conds.do_video)
+    {
+        printf("Trying to draw with video disabled! Not executed.\n");
+        return;
+    }
+    proc->cnv->Update();
+
+    // SDL_Event event;
+    // while (1) {
+    //     if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
+    //         break;
+    // }
+}
+static void proc_execute_sleep  (proc_t* proc)
+{
+    std::this_thread::sleep_for(std::chrono::milliseconds((size_t) ARG_));
+}
+// END: MISC
 
 #undef ARG_
 #undef CMD_

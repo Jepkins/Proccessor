@@ -5,7 +5,7 @@
 
 bool proc_setup(int argc, char** argv, StartConfig* run_conds)
 {
-    const char* optstring = " -i: --input_f: ";
+    const char* optstring = " -i: --input_f: --video ";
     // !!! always starts and ends with ' ', short options must be before long ones, do not use ':' in option names
 
     getopt_out opt_out = {.optind = 1};
@@ -44,6 +44,13 @@ bool proc_opt_proccessor (getopt_out opt_out, StartConfig *run_conds)
 
         run_conds->is_input_file_selected = true;
         run_conds->input_file = opt_out.optarg;
+
+        return 1;
+    }
+
+    if (!strcmp(opt_out.opt, "--video"))
+    {
+        run_conds->do_video = true;
 
         return 1;
     }

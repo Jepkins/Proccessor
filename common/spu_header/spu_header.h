@@ -5,7 +5,7 @@
 
 typedef struct {
     char signature[16] = "Jepkins";
-    double version = 2.0;
+    double version = 2.3;
     size_t code_size = 0;
 } spu_header_t;
 
@@ -18,7 +18,8 @@ typedef struct {
 #define PROC_CMD_LIST \
 /*  code  name     possible args  */\
 /*  |     |        |              */\
-    0xff, unknown, 0x00,            \
+    0xFF, unknown, 0x00,            \
+    0xF0, sleep,   0xEE,            \
     0x00, hlt,     0x01,            \
     0x01, push,    0xEE,            \
     0x02, pop,     0xE4,            \
@@ -31,6 +32,7 @@ typedef struct {
     0xA7, sqrt,    0x01,            \
     0xA8, sin,     0x01,            \
     0xA9, cos,     0x01,            \
+    0xAA, sqr,     0x01,            \
     0xD1, jmp,     0x02,            \
     0xD2, ja,      0x02,            \
     0xD3, jae,     0x02,            \
@@ -43,6 +45,7 @@ typedef struct {
     0xE1, in,      0x01,            \
     0xE2, out,     0x01,            \
     0xE3, dump,    0x01,            \
+    0xE4, draw,    0x01,            \
     TERMINATOR
 
 #define PROC_REGS_LIST \
@@ -63,6 +66,10 @@ typedef struct {
     13, CZ,     \
     14, DZ,     \
     15, EZ,     \
+    16, RR,     \
+    17, II,     \
+    18, JJ,     \
+    19, CC,     \
     TERMINATOR
 
 typedef short cmd_code_t;
@@ -78,8 +85,10 @@ static const cmd_code_t RAM_MASK         = (cmd_code_t)0x0400;
 static const cmd_code_t INDEX_MASK         = (cmd_code_t)0x0800;
 
 #define MAX_ARGS_NUMBER 2
-static const size_t PROC_REGS_NUMBER = 16;
-static const size_t PROC_RAM_SIZE = 1024;
+static const size_t PROC_REGS_NUMBER = 32;
+static const size_t PROC_RAM_SIZE = 10000;
+static const int DRAW_WIDTH = 100;
+static const int DRAW_HEIGHT = 100;
 
 
 // typedef struct {

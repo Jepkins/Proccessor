@@ -9,6 +9,8 @@ typedef struct {
     bool is_input_file_selected = false;
     const char* input_file = DEFAULT_CODE_FILE;
 
+    bool do_video = false;
+
     bool flagging_error = false;
 } StartConfig;
 

@@ -4,6 +4,7 @@
 #include "stack.h"
 #include "dynarr.h"
 #include "spu_header.h"
+#include "memcanvas.h"
 
 typedef struct {
     elm_t* arg_ptr;
@@ -13,14 +14,16 @@ typedef struct {
 typedef struct {
     stack_t* stk;
     char* code;
+    size_t code_size;
     size_t ip;
     full_cmd_t current_cmd;
     elm_t* regs;
     elm_t*  ram;
     stack_t* return_ips;
+    MemCanvas* cnv;
 } proc_t;
 
-static void proc_run(const char* code_filename);
+static int proc_run(const char* code_filename);
 static size_t proc_load (const char* code_filename, proc_t* proc);
 static cmd_code_t proc_execute_next(proc_t* proc);
 static void  proc_getfullcmd (proc_t* proc);

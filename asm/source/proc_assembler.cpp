@@ -7,6 +7,8 @@
 #include "spu_header.h"
 #include "cpp_preprocessor_logic.h"
 
+StartConfig run_conds;
+
 static asmblr_state_t* asmblr_state_new()
 {
     asmblr_state_t* asmblr = (asmblr_state_t*)calloc(1, sizeof(*asmblr));
@@ -50,7 +52,6 @@ static void asmblr_state_dtor(asmblr_state_t* asmblr)
 
 int main(int argc, char** argv)
 {
-    StartConfig run_conds;
     asmblr_setup(argc, argv, &run_conds);
 
     translate(run_conds.output_file, run_conds.input_file);
@@ -230,7 +231,7 @@ static size_t find_mark(asmblr_state_t* asmblr, const char* name)
     return i;
 }
 
-#define PARSE_ARG_PUSH_POP_IF_PUSHEND(index, name, ...) __VA_ARGS__             \
+#define PARSE_ARG_IF_PUSHEND(index, name, ...) __VA_ARGS__             \
     if(strcmp(reg, QUOTE(name)) == 0)                                           \
     {                                                                           \
         if (reg_met)                                                            \
@@ -319,7 +320,7 @@ static bool parse_arg(asmblr_state_t* asmblr, cmd_code_t* cmd_code, args_t* args
         // Expands to   if(strcmp(reg, "AX") == 0) { ... continue;}
         //              if(strcmp(reg, "BX") == 0) { ... continue;}
         //                                      ...
-        EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PARSE_ARG_PUSH_POP_IF_PUSHEND, PROC_REGS_LIST, )))
+        EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PARSE_ARG_IF_PUSHEND, PROC_REGS_LIST, )))
 
         // Not an argument
         break;
@@ -345,7 +346,7 @@ static bool parse_arg(asmblr_state_t* asmblr, cmd_code_t* cmd_code, args_t* args
 
     return 1;
 }
-#undef PARSE_ARG_PUSH_POP_IF_PUSHEND
+#undef PARSE_ARG_IF_PUSHEND
 
 #define GET_POSS_ARGS_PUSHEND(code, name, args, ...) __VA_ARGS__ case code: {return args;}
 static unsigned char get_possible_args(cmd_code_t code)

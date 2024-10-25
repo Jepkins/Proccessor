@@ -6,7 +6,7 @@ CFLAGS = -c -Wall -D _DEBUG -ggdb3 -std=c++17 -O0 -Wall -Wextra -Weffc++ -Wc++14
 -Wno-missing-field-initializers -Wno-narrowing -Wno-old-style-cast -Wno-varargs -Wsuggest-override\
 -Wlong-long -fopenmp -fcheck-new -fsized-deallocation -fstack-protector -fstrict-overflow -fno-omit-frame-pointer\
 -Wlarger-than=8192 -fPIE -Werror=vla -MP -MMD
-
+LDFLAGS = `sdl2-config --cflags --libs` -lSDL2 -lSDL2_mixer -lSDL2_image -lSDL2_ttf
 BUILD_DIR = build
 
 PROC_DIR = proccessor
@@ -58,7 +58,7 @@ make_asm:
 code ?= data/code.bin
 source ?= data/source_code.txt
 run:
-	./$(PROC_EXEC) -i $(code)
+	./$(PROC_EXEC) -i $(code) $(d_vid)
 
 compile:
 	./$(ASM_EXEC) -i $(source) -o $(code)
