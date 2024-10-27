@@ -5,13 +5,13 @@ hlt
 
 ;---------------------------------------------------------
 :getabc
-putcc 97 putcc 58 putcc 32
+putcc 97 58 32
 in
 pop AA
-putcc 98 putcc 58 putcc 32
+putcc 98 58 32
 in
 pop BB
-putcc 99 putcc 58 putcc 32
+putcc 99 58 32
 in
 pop CC
 ret
@@ -19,19 +19,17 @@ ret
 
 ;---------------------------------------------------------
 :square
-push 0
-push AA
+push 0 AA
 jne :skiplin1
 call :linear
 ret
 :skiplin1
 push BB sqr
-push AA push CC push 4
+push AA CC 4
 mul mul sub
 pop DD          ; discriminant
 
-push DD
-push 0
+push DD 0
 jbe :validsqr
 call :non
 ret
@@ -41,38 +39,36 @@ ret
 push BB inv
 push DD sqrt
 sub
-push AA push 2 mul div
-putcc 120 putcc 49 putcc 58 putcc 32    ; x1:
+push AA 2 mul div
+putcc 120 49 58 32    ; x1:
 out
 
 push BB inv
 push DD sqrt
 add
-push AA push 2 mul div
-putcc 120 putcc 50 putcc 58 putcc 32    ; x2:
+push AA 2 mul div
+putcc 120 50 58 32    ; x2:
 out
 ret
 ;---------------------------------------------------------
 
 ;---------------------------------------------------------
 :linear
-push BB
-push 0
+push BB 0
 jne :skipconst
 call :const
 ret
 :skipconst
 push CC inv
 push BB div
-putcc 120 putcc 58 putcc 32    ; x:
+putcc 120 58 32    ; x:
 out
 ret
 ;---------------------------------------------------------
 
 ;---------------------------------------------------------
 :const
-push CC
-push 0
+push CC 0
 jne :nosols
 call :anyn
 ret
@@ -83,12 +79,12 @@ ret
 
 ;---------------------------------------------------------
 :anyn
-putcc 97 putcc 110 putcc 121 putcc 10   ; any'\n'
+putcc 97 110 121 10   ; any'\n'
 ret
 ;---------------------------------------------------------
 
 ;---------------------------------------------------------
 :non
-putcc 110 putcc 111 putcc 10            ; no'\n'
+putcc 110 111 10            ; no'\n'
 ret
 ;---------------------------------------------------------

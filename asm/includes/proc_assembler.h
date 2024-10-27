@@ -55,6 +55,7 @@ typedef struct {
 } asmblr_state_t;
 
 typedef struct {
+    unsigned char type;
     elm_t val;
     size_t ind;
 } args_t;
@@ -69,9 +70,11 @@ static void skip_line(FILE* src);
 static cmd_code_t get_cmd_code(const char* cmd_word);
 static bool add_mark(asmblr_state_t* asmblr, char* name, size_t ip);
 static size_t find_mark(asmblr_state_t* asmblr, const char* name);
-static bool parse_arg(asmblr_state_t* asmblr, cmd_code_t* cmd_code, args_t* args, FILE* src);
-static unsigned char get_possible_args(cmd_code_t code);
+static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src);
+static unsigned int get_possible_args(cmd_code_t code);
+static unsigned int get_max_seqn(cmd_code_t code);
 
+static size_t get_curr_line(FILE* fstream);
 static bool execute_fixup(asmblr_state_t* asmblr);
 static void write_code(const char* dst_filename, dynarr_t* code);
 

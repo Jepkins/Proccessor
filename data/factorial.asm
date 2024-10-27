@@ -2,6 +2,8 @@ in
 call :factorial
 out
 hlt
+
+;-------------------
 :factorial
 dub
 push 1
@@ -11,3 +13,4 @@ call :factorial
 mul
 :factdone
 ret
+;-------------------

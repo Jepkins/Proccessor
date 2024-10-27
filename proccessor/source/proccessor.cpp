@@ -73,18 +73,17 @@ int main(int argc, char** argv)
 {
     proc_setup(argc, argv, &run_conds);
 
-    if (proc_run(run_conds.input_file) != 0)
+    if (proc_run() != 0)
         return 1;
     printf("done\n");
     return 0;
 }
 
 
-static int proc_run(const char* code_filename)
+static int proc_run()
 {
     proc_t* proc = proc_new(sizeof(elm_t));
-
-    size_t code_size = proc_load(code_filename, proc);
+    size_t code_size = proc_load(run_conds.input_file, proc);
     if (code_size == (size_t)-1)
     {
         printf("Failed to load. Break\n");
@@ -119,7 +118,12 @@ static size_t proc_load (const char* code_filename, proc_t* proc)
         else
         {
             proc->cnv = new MemCanvas;
-            proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, "RAM[]");
+            int init_ret = proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, IMAGE_SCALE, "RAM[]");
+            if (init_ret != 0)
+            {
+                printf("Failed to initialize canvas!\n");
+                run_conds.do_video = false;
+            }
         }
     }
 
@@ -172,11 +176,12 @@ static bool check_header (spu_header_t* head)
 }
 
 
-#define PROC_EXECUTE_CASES_PUSHEND(code, name, args, ...) __VA_ARGS__ case code: {CAT(proc_execute_, name)(proc); break;}
+#define PROC_EXECUTE_CASES_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ case code: {CAT(proc_execute_, name)(proc); break;}
 cmd_code_t proc_execute_next(proc_t* proc)
 {
+    // printf("Entered execute_next\n");
     proc_getfullcmd(proc);
-// printf("currcmd = %hX, arg = " ELM_T_FORMAT "\n", proc->current_cmd.cmd_code, *proc->current_cmd.arg_ptr);
+    // printf("Got instruction: code = %hX, argn = %lu\n", proc->current_cmd.cmd_code, proc->current_cmd.argn);
     switch (proc->current_cmd.cmd_code & LAST_BYTE_MASK)
     {
     // Expands to  case 0xff: {proc_execute_unknown(proc); break;}
@@ -193,59 +198,79 @@ cmd_code_t proc_execute_next(proc_t* proc)
 }
 #undef PROC_EXECUTE_CASES_PUSHEND
 
+#define CMD_CODE_ proc->current_cmd.cmd_code
+#define ARG_PTR_(n) proc->current_cmd.args[n].ptr
+#define ARG_TYPE_(n) proc->current_cmd.args[n].type
+#define ARGN_ proc->current_cmd.argn
 static void proc_getfullcmd (proc_t* proc)
 {
-    memcpy(&proc->current_cmd.cmd_code, proc->code + proc->ip, sizeof(proc->current_cmd.cmd_code));
-    proc->ip += sizeof(proc->current_cmd.cmd_code);
-
-    proc->current_cmd.arg_ptr = proc_getarg(proc, proc->current_cmd.cmd_code);
+    memcpy(&CMD_CODE_, proc->code + proc->ip, sizeof(CMD_CODE_));
+    proc->ip += sizeof(CMD_CODE_);
+    ARGN_ = (unsigned char)((CMD_CODE_ & SECOND_BYTE_MASK) >> 8);
+    // printf("code = %hX, argn = %lu\n", CMD_CODE_, ARGN_);
+    proc_getargs(proc);
 }
-static elm_t* proc_getarg (proc_t* proc, cmd_code_t cmd)
+static void proc_getargs (proc_t* proc)
 {
-    elm_t value = 0;
-    size_t ind = 0;
-
-    if (cmd & INDEX_MASK)
+    for (size_t argi = 0; argi < ARGN_; argi++)
     {
-        memcpy(&ind, proc->code + proc->ip, sizeof(ind));
-        proc->ip += sizeof(ind);
-        proc->regs[0] = (elm_t)ind;
-        return &proc->regs[0];
-    }
-    bool imd_met = false, reg_met = false;
-    if ((imd_met = cmd & IMMEDIATE_MASK))
-    {
-        memcpy(&value, proc->code + proc->ip, sizeof(value));
-        proc->ip += sizeof(value);
-    }
-    if ((reg_met = cmd & REGISTER_MASK))
-    {
-        memcpy(&ind, proc->code + proc->ip, sizeof(ind));
-        proc->ip += sizeof(ind);
-        value += proc->regs[ind];
-    }
-    if (cmd & RAM_MASK)
-    {
-        assert((size_t)round(value) < PROC_RAM_SIZE && "RAM: out of boundaries");
-        return &proc->ram[(size_t)round(value)];
-    }
-    else
-    {
-        if (!imd_met && reg_met)
+        elm_t value = 0;
+        size_t ind = 0;
+        unsigned char type = 0;
+        // printf("getarg: ip = %lu\n", proc->ip);
+        memcpy(&type, proc->code + proc->ip, sizeof(type));
+        proc->ip += sizeof(type);
+        ARG_TYPE_(argi) = type;
+        if (type & INDEX_MASK)
         {
-            return &proc->regs[ind];
+            memcpy(&ind, proc->code + proc->ip, sizeof(ind));
+            proc->ip += sizeof(ind);
+            proc->regs[argi] = (elm_t)ind;
+            ARG_PTR_(argi) = &proc->regs[argi];
+            continue;
+        }
+        bool imd_met = false, reg_met = false;
+        if ((imd_met = type & IMMEDIATE_MASK))
+        {
+            memcpy(&value, proc->code + proc->ip, sizeof(value));
+            proc->ip += sizeof(value);
+        }
+        if ((reg_met = type & REGISTER_MASK))
+        {
+            memcpy(&ind, proc->code + proc->ip, sizeof(ind));
+            proc->ip += sizeof(ind);
+            value += proc->regs[ind];
+        }
+        if (type & RAM_MASK)
+        {
+            assert((size_t)round(value) < PROC_RAM_SIZE && "RAM: out of boundaries");
+            ARG_PTR_(argi) = &proc->ram[(size_t)round(value)];
+            continue;
         }
         else
         {
-            proc->regs[0] = value;
-            return &proc->regs[0];
+            if (!imd_met && reg_met)
+            {
+                ARG_PTR_(argi) = &proc->regs[ind];
+                continue;
+            }
+            else
+            {
+                proc->regs[argi] = value;
+                ARG_PTR_(argi) = &proc->regs[argi];
+                continue;
+            }
         }
     }
 }
-
+#undef CMD_CODE_
+#undef ARG_PTR_
+#undef ARG_TYPE_
+#undef ARGN_
 /*================================================================================================================================*/
 
-#define ARG_ *(proc->current_cmd.arg_ptr)
+#define ARG_(n) *(proc->current_cmd.args[n].ptr)
+#define ARGN_ (proc->current_cmd.argn)
 #define CMD_ proc->current_cmd.cmd_code
 #define POP_(elm)  elm_t elm = 0; stack_pop(proc->stk, &elm);
 #define PUSH_(elm) stack_push(proc->stk, &elm);
@@ -269,43 +294,43 @@ static void proc_execute_hlt(proc_t* proc)
 
 static void proc_execute_jmp(proc_t* proc)
 {
-    proc->ip = (size_t)ARG_;
+    proc->ip = (size_t)ARG_(0);
 }
 static void proc_execute_ja(proc_t* proc)
 {
     POP_POP(elm_new, elm_old)
     if (elm_new > elm_old)
-        proc->ip = (size_t)ARG_;
+        proc->ip = (size_t)ARG_(0);
 }
 static void proc_execute_jae(proc_t* proc)
 {
     POP_POP(elm_new, elm_old)
     if (elm_new >= elm_old)
-        proc->ip = (size_t)ARG_;
+        proc->ip = (size_t)ARG_(0);
 }
 static void proc_execute_jb(proc_t* proc)
 {
     POP_POP(elm_new, elm_old)
     if (elm_new < elm_old)
-        proc->ip = (size_t)ARG_;
+        proc->ip = (size_t)ARG_(0);
 }
 static void proc_execute_jbe(proc_t* proc)
 {
     POP_POP(elm_new, elm_old)
     if (elm_new <= elm_old)
-        proc->ip = (size_t)ARG_;
+        proc->ip = (size_t)ARG_(0);
 }
 static void proc_execute_je(proc_t* proc)
 {
     POP_POP(elm_new, elm_old)
     if (elm_new == elm_old)
-        proc->ip = (size_t)ARG_;
+        proc->ip = (size_t)ARG_(0);
 }
 static void proc_execute_jne(proc_t* proc)
 {
     POP_POP(elm_new, elm_old)
     if (elm_new != elm_old)
-        proc->ip = (size_t)ARG_;
+        proc->ip = (size_t)ARG_(0);
 }
 
 #undef POP_POP
@@ -316,7 +341,7 @@ static void proc_execute_call(proc_t* proc)
 {
     size_t ip_next = proc->ip;
     stack_push(proc->return_ips, &ip_next);
-    proc->ip = (size_t)ARG_;
+    proc->ip = (size_t)ARG_(0);
 }
 static void proc_execute_ret(proc_t* proc)
 {
@@ -326,14 +351,27 @@ static void proc_execute_ret(proc_t* proc)
 }
 // END: FUNCS
 
+// START: MEMOPERS
 static void proc_execute_push(proc_t* proc)
 {
-    PUSH_(ARG_)
+    for (size_t i = 0; i < ARGN_; i++)
+    {
+        PUSH_(ARG_(i))
+    }
 }
 static void proc_execute_pop(proc_t* proc)
 {
-    stack_pop(proc->stk, &ARG_);
+    POP_(elm)
+    for (size_t i = 0; i < ARGN_; i++)
+    {
+        memcpy(&ARG_(i), &elm, sizeof(elm));
+    }
 }
+static void proc_execute_mov(proc_t* proc)
+{
+    memcpy(&ARG_(0), &ARG_(1), sizeof(ARG_(0)));
+}
+// END: MEMOPERS
 
 // START: UNARY
 
@@ -405,7 +443,7 @@ static void proc_execute_div (proc_t* proc)
 // START: iostreams
 static void proc_execute_putcc (proc_t* proc)
 {
-    putc((int)ARG_, stdout);
+    putc((int)ARG_(0), stdout);
 }
 static void proc_execute_out (proc_t* proc)
 {
@@ -444,20 +482,15 @@ static void proc_execute_draw  (proc_t* proc)
         return;
     }
     proc->cnv->Update();
-
-    // SDL_Event event;
-    // while (1) {
-    //     if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
-    //         break;
-    // }
 }
 static void proc_execute_sleep  (proc_t* proc)
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds((size_t) ARG_));
+    std::this_thread::sleep_for(std::chrono::milliseconds((size_t) ARG_(0)));
 }
 // END: MISC
 
 #undef ARG_
+#undef ARGN_
 #undef CMD_
 #undef POP_
 #undef PUSH_

@@ -59,7 +59,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-#define ERRMSG(msg, ... /* param */) printf("[%lu]" msg "\n", asmblr->ip, __VA_ARGS__)
+#define ERRMSG(msg, ... /* param */) printf("[%lu]" msg "\n", get_curr_line(src), __VA_ARGS__)
 
 static int translate (const char* dst_filename, const char* src_filename)
 {
@@ -107,10 +107,10 @@ static int translate (const char* dst_filename, const char* src_filename)
         {
         CASE_JUMP_CALL
         (
-            cmd_code = cmd_code ^ INDEX_MASK;
             char jump_mark[MAXWRDLEN] = {};
             if (!fscanf(src, "%" QUOTE(MAXWRDLEN) "s", jump_mark) || jump_mark[0] != ':')
             {
+                fseek(src, -(int)strlen(jump_mark), SEEK_CUR);
                 ERRMSG("Expected mark after %s", cmd_word);
                 error_met = true;
                 continue;
@@ -123,36 +123,47 @@ static int translate (const char* dst_filename, const char* src_filename)
             }
             size_t mark_ip = ((mark_t*)dynarr_see(asmblr->marks, mark_ind))->ip;
 
+            cmd_code |= (1 << 8); // 1 arg
+            unsigned char type = INDEX_MASK;
+            dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
+            asmblr->ip += sizeof(cmd_code);
+            dynarr_push(asmblr->code, &type, sizeof(type));
+            asmblr->ip += sizeof(type);
             if (mark_ip == (size_t)-1)
             {
-                fixup_t new_fixup = {mark_ind, asmblr->ip + sizeof(cmd_code)};
+                fixup_t new_fixup = {mark_ind, asmblr->ip};
                 stack_push(asmblr->fixups, &new_fixup);
             }
-            asmblr->ip += sizeof(cmd_code);
-            dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
-            asmblr->ip += sizeof(mark_ip);
             dynarr_push(asmblr->code, &mark_ip, sizeof(mark_ip));
+            asmblr->ip += sizeof(mark_ip);
             break;
         )
         default:
         {
-            args_t args = {};
-            if (!parse_arg(asmblr, &cmd_code, &args, src))
+            args_t args[MAXARGN] = {};
+            int argn = -1;
+            if ((argn = parse_args(cmd_code, args, src)) == -1)
             {
                 error_met = true;
                 continue;
             }
-            asmblr->ip += sizeof(cmd_code);
+            cmd_code |= (unsigned char)argn << 8;
             dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
-            if (cmd_code & IMMEDIATE_MASK)
+            asmblr->ip += sizeof(cmd_code);
+            for (int i = 0; argn > 0; i++, argn--)
             {
-                asmblr->ip += sizeof(args.val);
-                dynarr_push(asmblr->code, &args.val, sizeof(args.val));
-            }
-            if (cmd_code &  REGISTER_MASK)
-            {
-                asmblr->ip += sizeof(args.ind);
-                dynarr_push(asmblr->code, &args.ind, sizeof(args.ind));
+                dynarr_push(asmblr->code, &args[i].type, sizeof(args[i].type));
+                asmblr->ip += sizeof(args[i].type);
+                if (args[i].type & IMMEDIATE_MASK)
+                {
+                    dynarr_push(asmblr->code, &args[i].val, sizeof(args[i].val));
+                    asmblr->ip += sizeof(args[i].val);
+                }
+                if (args[i].type & REGISTER_MASK)
+                {
+                    dynarr_push(asmblr->code, &args[i].ind, sizeof(args[i].ind));
+                    asmblr->ip += sizeof(args[i].ind);
+                }
             }
         }
         }
@@ -186,7 +197,7 @@ static void skip_line(FILE* src)
     } while(c != '\n' && c != EOF);
 }
 
-#define ASMBLR_STRCMP_PUSHEND(code, name, args, ...) __VA_ARGS__ if(strcmp(cmd_word, QUOTE(name)) == 0) {return (CAT(CMD_, name) & LAST_BYTE_MASK);}
+#define ASMBLR_STRCMP_PUSHEND(code, name, seqn, args, ...) __VA_ARGS__ if(strcmp(cmd_word, QUOTE(name)) == 0) {return (CAT(CMD_, name) & LAST_BYTE_MASK);}
 static cmd_code_t get_cmd_code(const char* cmd_word)
 {
     // Expands to   if(strcmp(cmd_word, "unknown") == 0) return (CMD_unknown & LAST_BYTE_MASK);
@@ -211,7 +222,7 @@ static bool add_mark(asmblr_state_t* asmblr, char* name, size_t ip)
     {
         if (((mark_t*)dynarr_see(asmblr->marks, i))->ip != (size_t)-1)
         {
-            ERRMSG("Multiple mark definition: %s", ((mark_t*)dynarr_see(asmblr->marks, i))->name);
+            printf("Multiple mark definition: %s\n", ((mark_t*)dynarr_see(asmblr->marks, i))->name);
             return 0;
         }
         else
@@ -230,132 +241,185 @@ static size_t find_mark(asmblr_state_t* asmblr, const char* name)
 
     while (i < marks_num && strcmp(name, ((mark_t*)dynarr_see(asmblr->marks, i))->name) != 0)
         i++;
-// printf("hi, i'm find_mark() i = %lu\n", i);
+
     if(i == marks_num)
         return (size_t)-1;
 
     return i;
 }
 
-#define PARSE_ARG_IF_PUSHEND(index, name, ...) __VA_ARGS__             \
+#define PARSE_ARGS_IF_PUSHEND(index, name, ...) __VA_ARGS__                     \
     if(strcmp(reg, QUOTE(name)) == 0)                                           \
     {                                                                           \
         if (reg_met)                                                            \
         {                                                                       \
             ERRMSG("Multiple registers: %s", argword);                          \
-            return 0;                                                           \
+            error_met = true;                                                   \
+            break;                                                              \
         }                                                                       \
         reg_met = true;                                                         \
         plus = false;                                                           \
         i += 2;                                                                 \
-        args->ind = index;                                                      \
+        args[argnum].ind = index;                                               \
         continue;                                                               \
     }
 
-static bool parse_arg(asmblr_state_t* asmblr, cmd_code_t* cmd_code, args_t* args, FILE* src)
+static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
 {
-    unsigned char poss_args = get_possible_args(*cmd_code);
+    unsigned int poss_args = get_possible_args(cmd_code);
+    unsigned int max_seqn = get_max_seqn(cmd_code);
+    unsigned int argn_in_seq = 0;
+    for (unsigned int poss_args_temp = poss_args; poss_args_temp != 0; poss_args_temp <<= 8)
+        argn_in_seq++;
+
     assert(poss_args && "invalid cmd_code");
-    if (poss_args == 0x01)
-        return 1;
 
-    char argword[MAXWRDLEN] = {};
-    fscanf(src, "%s", argword);
-    size_t len = strlen(argword);
-    assert(len != 0 && "invalid argword");
-    bool do_ram  = false;
-    bool imd_met = false;
-    bool reg_met = false;
-    bool plus = true;
+    if (max_seqn == 0)
+        return 0;
 
-    if (argword[0] == '[')
+    bool error_met = false;
+    bool break_flag = false;
+    unsigned int seqnum = 0;
+    int argnum = 0;
+
+    for (; !break_flag ; seqnum++)
     {
-        if (len < 2 || argword[len-1] != ']')
+        for (unsigned int poss_args_temp = poss_args, argnum_in_seq = 0; poss_args_temp != 0; poss_args_temp >>= 8, argnum_in_seq++)
         {
-            ERRMSG("Expected ']': %s <- here", argword);
-            return 0;
-        }
-        do_ram = true;
-        len -= 1;
-    }
-    for(size_t i = do_ram; i < len;)
-    {
-        if (argword[i] == '+')
-        {
-            if (plus)
-            {
-                ERRMSG("Multiple '+': %s", argword);
-                return 0;
-            }
-            plus = true;
-            i++;
-            continue;
-        }
-        if (!plus)
-        {
-            ERRMSG("Use '+': %s", argword);
-            return 0;
-        }
+            char argword[MAXWRDLEN] = {};
+            fscanf(src, "%s", argword);
+            size_t len = strlen(argword);
+            assert(len != 0 && "invalid argword");
+            bool do_ram  = false;
+            bool imd_met = false;
+            bool reg_met = false;
+            bool plus = true;
 
-        int scan_n = 0;
-        sscanf(argword + i, ELM_T_FORMAT "%n", &args->val, &scan_n);
-        if(scan_n)
-        {
-            if (imd_met)
+            if (argword[0] == '[')
             {
-                ERRMSG("Multiple immediate arguments: %s", argword);
-                return 0;
+                if (len < 2 || argword[len-1] != ']')
+                {
+                    ERRMSG("Expected ']': %s <- here", argword);
+                    error_met = true;
+                    continue;
+                }
+                do_ram = true;
+                len -= 1;
             }
-            if (!plus)
+            for(size_t i = do_ram; i < len;)
             {
-                ERRMSG("Use '+': %s", argword);
-                return 0;
+                if (argword[i] == '+')
+                {
+                    if (plus)
+                    {
+                        ERRMSG("Unexpected '+': %s", argword);
+                        error_met = true;
+                        break;
+                    }
+                    plus = true;
+                    i++;
+                    continue;
+                }
+                if (!plus)
+                {
+                    ERRMSG("Unexpected token: %s", argword);
+                    error_met = true;
+                    break;
+                }
+
+                int scan_n = 0;
+                sscanf(argword + i, ELM_T_FORMAT "%n", &args[argnum].val, &scan_n);
+                if(scan_n)
+                {
+                    if (imd_met)
+                    {
+                        ERRMSG("Multiple immediate arguments: %s", argword);
+                        error_met = true;
+                        break;
+                    }
+                    if (!plus)
+                    {
+                        ERRMSG("Use '+': %s", argword);
+                        error_met = true;
+                        break;
+                    }
+                    else
+                    {
+                        imd_met = true;
+                        plus = false;
+                        i += (size_t)scan_n;
+                        continue;
+                    }
+                }
+
+                char reg[3] = {};
+                if (len - i >= 2)
+                    sscanf(argword + i, "%2s", reg);
+
+                // Expands to   if(strcmp(reg, "AX") == 0) { ... continue;}
+                //              if(strcmp(reg, "BX") == 0) { ... continue;}
+                //                                      ...
+                EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PARSE_ARGS_IF_PUSHEND, PROC_REGS_LIST, )))
+
+                // Not an argument
+                if (argnum_in_seq != 0)
+                {
+                    error_met = true;
+                    ERRMSG("Unfinished arguments sequence, last: %s", argword);
+                }
+                fseek(src, -(int)len, SEEK_CUR);
+                break_flag = true;
+                break;
             }
-            else
+            if (break_flag)
+                break;
+
+            unsigned char read_arg = (unsigned char) (1 << (imd_met * 1) << (reg_met * 2) << (do_ram * 4));
+            if(!(read_arg & poss_args_temp))
             {
-                imd_met = true;
-                plus = false;
-                i += (size_t)scan_n;
+                if (read_arg == 0x01)
+                    ERRMSG("Expected argument before %s", argword);
+                else
+                    ERRMSG("Invalid argument: %s", argword);
                 continue;
             }
+
+            if (plus)
+            {
+                ERRMSG("Expected argument after '+': %s", argword);
+                error_met = true;
+                continue;
+            }
+            if (imd_met) args[argnum].type |= IMMEDIATE_MASK;
+            if (reg_met) args[argnum].type |= REGISTER_MASK;
+            if (do_ram)  args[argnum].type |= RAM_MASK;
+            if (argnum < MAXARGN - 1) argnum++;
         }
-
-        char reg[3] = {};
-        sscanf(argword + i, "%2s", reg);
-
-        // Expands to   if(strcmp(reg, "AX") == 0) { ... continue;}
-        //              if(strcmp(reg, "BX") == 0) { ... continue;}
-        //                                      ...
-        EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PARSE_ARG_IF_PUSHEND, PROC_REGS_LIST, )))
-
-        // Not an argument
-        break;
     }
-
-    unsigned char read_arg = (unsigned char) (1 << (imd_met * 1) << (reg_met * 2) << (do_ram * 4));
-    if(!(read_arg & poss_args))
+    seqnum--;
+    if (seqnum > max_seqn)
     {
-        if (read_arg == 1)
-            ERRMSG("Expected argument before %s", argword);
-        else
-            ERRMSG("Invalid argument: %s", argword);
+        ERRMSG("Too many argument sequences for (code)" CMD_CODE_FORMAT, cmd_code & LAST_BYTE_MASK);
+        error_met = true;
     }
-
-    if (plus)
+    if (seqnum == 0 && max_seqn != 0)
     {
-        ERRMSG("Expected argument after '+': %s", argword);
-        return 0;
+        ERRMSG("Expected arguments for (code)" CMD_CODE_FORMAT, cmd_code & LAST_BYTE_MASK);
+        error_met = true;
     }
-    if (imd_met) *cmd_code = *cmd_code ^ IMMEDIATE_MASK;
-    if (reg_met) *cmd_code = *cmd_code ^ REGISTER_MASK;
-    if (do_ram)  *cmd_code = *cmd_code ^ RAM_MASK;
-
-    return 1;
+    if (argnum == MAXARGN - 1)
+    {
+        ERRMSG("Potentially exceeded MAXARGN for (code)" CMD_CODE_FORMAT, cmd_code & LAST_BYTE_MASK);
+    }
+    // printf("code = %hX, poss_args = %X, max_seqn = %u, gotseq = %u\n", cmd_code, poss_args, max_seqn, seqnum);
+    if (error_met)
+        return -1;
+    return argnum;
 }
-#undef PARSE_ARG_IF_PUSHEND
+#undef PARSE_ARGS_IF_PUSHEND
 
-#define GET_POSS_ARGS_PUSHEND(code, name, args, ...) __VA_ARGS__ case code: {return args;}
-static unsigned char get_possible_args(cmd_code_t code)
+#define GET_POSS_ARGS_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ case code: {return args;}
+static unsigned int get_possible_args(cmd_code_t code)
 {
     code = code & LAST_BYTE_MASK;
     switch (code)
@@ -369,6 +433,21 @@ static unsigned char get_possible_args(cmd_code_t code)
 }
 #undef GET_POSS_ARGS_PUSHEND
 
+#define GET_MAX_SEQN_PUSHEND(code, name, seqn, args, ...) __VA_ARGS__ case code: {return seqn;}
+static unsigned int get_max_seqn(cmd_code_t code)
+{
+    code = code & LAST_BYTE_MASK;
+    switch (code)
+    {
+        // Expands to  case 0xff: {return  0;}
+        //             case 0x01: {return 10;}
+        //                        ...
+        EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, GET_MAX_SEQN_PUSHEND, PROC_CMD_LIST, )))
+        default: return 0;
+    }
+}
+#undef GET_MAX_SEQN_PUSHEND
+
 static bool execute_fixup(asmblr_state_t* asmblr)
 {
     if (dynarr_curr_size(asmblr->code) == 0)
@@ -379,12 +458,11 @@ static bool execute_fixup(asmblr_state_t* asmblr)
         fixup_t fixup = {};
         stack_pop(asmblr->fixups, &fixup);
         mark_t* mark = (mark_t*)dynarr_see(asmblr->marks, fixup.mark_ind);
-        // printf("fix: ip = %lu, ind = %lu\n", mark->ip, fixup.mark_ind);
         size_t fixed_ip = mark->ip;
 
         if (fixed_ip == (size_t)-1)
         {
-            ERRMSG("Mark used but not defined: %s", mark->name);
+            printf("Mark used but not defined: %s\n", mark->name);
             return 0;
         }
         *(size_t*)dynarr_see(asmblr->code, fixup.ip) = fixed_ip;
@@ -406,6 +484,20 @@ static void write_code(const char* dst_filename, dynarr_t* code)
     head.code_size = code_size;
     fwrite(&head, sizeof(head), 1, dst);
     fwrite(dynarr_see(code, 0), sizeof(char) , code_size, dst);
+}
+
+static size_t get_curr_line(FILE* fstream)
+{
+    long int curr_shift = ftell(fstream);
+    fseek(fstream, 0, SEEK_SET);
+    size_t line = 1;
+    for (int i = 0; i < curr_shift; i++)
+    {
+        if (fgetc(fstream) == '\n')
+            line++;
+    }
+    fseek(fstream, curr_shift, SEEK_SET);
+    return line;
 }
 
 #undef ERRMSG
