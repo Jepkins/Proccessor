@@ -7,8 +7,8 @@
 #include "dynarr.h"
 
 static const size_t CAP_MULTIPLICATOR = 2;  // >= 2 !!!
-static const size_t EXPONENTIAL_LIMIT = 1e6;
-static const size_t MAX_CAP = 1e8;
+static const size_t EXPONENTIAL_LIMIT = 1e9;
+static const size_t MAX_CAP = 1e10;
 static const size_t DUMP_MAX_DATA = 100;
 
 struct dynarr{

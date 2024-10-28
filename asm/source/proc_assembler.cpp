@@ -52,10 +52,12 @@ static void asmblr_state_dtor(asmblr_state_t* asmblr)
 
 int main(int argc, char** argv)
 {
+    timer_cl t;
+    t.start();
     asmblr_setup(argc, argv, &run_conds);
 
     translate(run_conds.output_file, run_conds.input_file);
-
+    t.end();
     return 0;
 }
 

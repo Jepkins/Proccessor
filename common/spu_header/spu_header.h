@@ -1,7 +1,37 @@
 #ifndef SPU_HEADER_H
 #define SPU_HEADER_H
 
+#include <cstdint>
 #include "cpp_preprocessor_logic.h"
+
+#ifndef MY_TIMER_H
+#define MY_TIMER_H
+
+#include <stdio.h>
+#include <time.h>
+
+class timer_cl
+{
+    private:
+        long int mark = 0;
+        bool started = false;
+    public:
+        void start()
+        {
+            mark = clock();
+            started = true;
+        }
+        void end()
+        {
+            if (started)
+            {
+                printf("TIME = %ld\n", clock() - mark);
+                started = false;
+            }
+        }
+};
+
+#endif // MY_TIMER_H
 
 typedef struct {
     char signature[16] = "Jepkins";
@@ -87,8 +117,8 @@ typedef struct {
 
 typedef short cmd_code_t;
 #define CMD_CODE_FORMAT "%4hX"
-typedef int elm_t;
-#define ELM_T_FORMAT "%d"
+typedef uint32_t elm_t;
+#define ELM_T_FORMAT "%u"
 
 static const cmd_code_t SECOND_BYTE_MASK = (cmd_code_t)0xFF00;
 static const cmd_code_t LAST_BYTE_MASK   = (cmd_code_t)0x00FF;

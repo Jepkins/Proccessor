@@ -71,11 +71,14 @@ static void proc_dtor (proc_t* proc)
 
 int main(int argc, char** argv)
 {
+    timer_cl t;
+    t.start();
     proc_setup(argc, argv, &run_conds);
 
     if (proc_run() != 0)
         return 1;
     printf("done\n");
+    t.end();
     return 0;
 }
 

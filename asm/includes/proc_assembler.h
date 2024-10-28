@@ -5,35 +5,6 @@
 #include "dynarr.h"
 #include "stack.h"
 
-#ifndef MY_TIMER_H
-#define MY_TIMER_H
-
-#include <stdio.h>
-#include <time.h>
-
-class timer_cl
-{
-    private:
-        long int mark = 0;
-        bool started = false;
-    public:
-        void start()
-        {
-            mark = clock();
-            started = true;
-        }
-        void end()
-        {
-            if (started)
-            {
-                printf("TIME = %ld\n", clock() - mark);
-                started = false;
-            }
-        }
-};
-
-#endif // MY_TIMER_H
-
 #define MAXWRDLEN  15
 #define CASE_JUMP_CALL(...) case CMD_call: case CMD_jmp: case CMD_ja: case CMD_jae: case CMD_jb: case CMD_jbe: case CMD_je: case CMD_jne: {__VA_ARGS__}
 
