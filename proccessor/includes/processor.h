@@ -5,6 +5,7 @@
 #include "dynarr.h"
 #include "spu_header.h"
 #include "memcanvas.h"
+#include "mytimer.h"
 
 typedef struct {
     elm_t* ptr;

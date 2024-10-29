@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     if (proc_run() != 0)
         return 1;
     printf("done\n");
-    t.end();
+    printf("TIME = %ldmks\n", t.time());
     return 0;
 }
 
@@ -224,7 +224,7 @@ static void proc_getargs (proc_t* proc)
         memcpy(&type, proc->code + proc->ip, sizeof(type));
         proc->ip += sizeof(type);
         ARG_TYPE_(argi) = type;
-        if (type & INDEX_MASK)
+        if (type & MARK_MASK)
         {
             memcpy(&ind, proc->code + proc->ip, sizeof(ind));
             proc->ip += sizeof(ind);
@@ -248,20 +248,17 @@ static void proc_getargs (proc_t* proc)
         {
             assert((size_t)round(value) < PROC_RAM_SIZE && "RAM: out of boundaries");
             ARG_PTR_(argi) = &proc->ram[(size_t)round(value)];
-            continue;
         }
         else
         {
             if (!imd_met && reg_met)
             {
                 ARG_PTR_(argi) = &proc->regs[ind];
-                continue;
             }
             else
             {
                 proc->regs[argi] = value;
                 ARG_PTR_(argi) = &proc->regs[argi];
-                continue;
             }
         }
     }
@@ -274,7 +271,7 @@ static void proc_getargs (proc_t* proc)
 
 #define ARG_(n) *(proc->current_cmd.args[n].ptr)
 #define ARGN_ (proc->current_cmd.argn)
-#define CMD_ proc->current_cmd.cmd_code
+#define CMD_  (proc->current_cmd.cmd_code)
 #define POP_(elm)  elm_t elm = 0; stack_pop(proc->stk, &elm);
 #define PUSH_(elm) stack_push(proc->stk, &elm);
 
@@ -373,6 +370,13 @@ static void proc_execute_pop(proc_t* proc)
 static void proc_execute_mov(proc_t* proc)
 {
     memcpy(&ARG_(0), &ARG_(1), sizeof(ARG_(0)));
+}
+static void proc_execute_mst(proc_t* proc)
+{
+    for (size_t i = 0; i < (size_t)ARG_(2); i++)
+    {
+        *(&ARG_(0) + i) = ARG_(1);
+    }
 }
 // END: MEMOPERS
 

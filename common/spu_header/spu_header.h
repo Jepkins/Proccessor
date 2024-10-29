@@ -4,38 +4,9 @@
 #include <cstdint>
 #include "cpp_preprocessor_logic.h"
 
-#ifndef MY_TIMER_H
-#define MY_TIMER_H
-
-#include <stdio.h>
-#include <time.h>
-
-class timer_cl
-{
-    private:
-        long int mark = 0;
-        bool started = false;
-    public:
-        void start()
-        {
-            mark = clock();
-            started = true;
-        }
-        void end()
-        {
-            if (started)
-            {
-                printf("TIME = %ld\n", clock() - mark);
-                started = false;
-            }
-        }
-};
-
-#endif // MY_TIMER_H
-
 typedef struct {
     char signature[16] = "Jepkins";
-    double version = 3.1;
+    double version = 3.6;
     size_t code_size = 0;
 } spu_header_t;
 
@@ -43,47 +14,49 @@ typedef struct {
 //                     |   |   |   |
 // possible sequence:  0 0 0 0 0 0 0 0    --- lowest byte represents first argument
 //                       |   |   |   |
-//                       MR  M   R   NONE
+//                       MR  M   R   MARK (incompatible with others)
+//                           |
+//                           invalid
 // I - immediate, R - register, M - RAM
-// Example: EE - rvalues, E4 - lvalues
+// Example: 0xEE - rvalues, 0xE4 - lvalues
 // Max sequence length = sizeof(int)
 //
 // seqn - max number of sequences
 //
-// MORON: possseq = 0x01  <=>  seqn = 0
 #define PROC_CMD_LIST \
-/*  code  name     seqn   possible sequence  */\
-/*  |     |        |      |                  */\
-    0xFF, unknown, 0,     0x00,                \
-    0xF0, sleep,   1,     0xEE,                \
-    0x00, hlt,     0,     0x01,                \
-    0x01, push,    10,    0xEE,                \
-    0x02, pop,     10,    0xE4,                \
-    0x03, mov,     1,     0xEEE4,              \
-    0xA1, inv,     0,     0x01,                \
-    0xA2, dub,     0,     0x01,                \
-    0xA3, add,     0,     0x01,                \
-    0xA4, sub,     0,     0x01,                \
-    0xA5, mul,     0,     0x01,                \
-    0xA6, div,     0,     0x01,                \
-    0xA7, sqrt,    0,     0x01,                \
-    0xA8, sin,     0,     0x01,                \
-    0xA9, cos,     0,     0x01,                \
-    0xAA, sqr,     0,     0x01,                \
-    0xD1, jmp,     1,     0x02,                \
-    0xD2, ja,      1,     0x02,                \
-    0xD3, jae,     1,     0x02,                \
-    0xD4, jb,      1,     0x02,                \
-    0xD5, jbe,     1,     0x02,                \
-    0xD6, je,      1,     0x02,                \
-    0xD7, jne,     1,     0x02,                \
-    0xDA, call,    1,     0x02,                \
-    0xDB, ret,     0,     0x01,                \
-    0xE0, putcc,   100,   0xEE,                \
-    0xE1, in,      0,     0x01,                \
-    0xE2, out,     0,     0x01,                \
-    0xE3, dump,    0,     0x01,                \
-    0xE4, draw,    0,     0x01,                \
+/*  code  name     seqn   possible sequence  */ \
+/*  |     |        |      |                  */ \
+    0xFF, unknown, 0,     0x00,                 \
+    0xF0, sleep,   1,     0xEE,                 \
+    0x00, hlt,     0,     0x00,                 \
+    0x01, push,    10,    0xEE,                 \
+    0x02, pop,     10,    0xE4,                 \
+    0x03, mov,     1,     0xEEE4,               \
+    0x04, mst,     1,     0xEEEEE0,             \
+    0xA1, inv,     0,     0x00,                 \
+    0xA2, dub,     0,     0x00,                 \
+    0xA3, add,     0,     0x00,                 \
+    0xA4, sub,     0,     0x00,                 \
+    0xA5, mul,     0,     0x00,                 \
+    0xA6, div,     0,     0x00,                 \
+    0xA7, sqrt,    0,     0x00,                 \
+    0xA8, sin,     0,     0x00,                 \
+    0xA9, cos,     0,     0x00,                 \
+    0xAA, sqr,     0,     0x00,                 \
+    0xD1, jmp,     1,     0x01,                 \
+    0xD2, ja,      1,     0x01,                 \
+    0xD3, jae,     1,     0x01,                 \
+    0xD4, jb,      1,     0x01,                 \
+    0xD5, jbe,     1,     0x01,                 \
+    0xD6, je,      1,     0x01,                 \
+    0xD7, jne,     1,     0x01,                 \
+    0xDA, call,    1,     0x01,                 \
+    0xDB, ret,     0,     0x00,                 \
+    0xE0, putcc,   100,   0xEE,                 \
+    0xE1, in,      0,     0x00,                 \
+    0xE2, out,     0,     0x00,                 \
+    0xE3, dump,    0,     0x00,                 \
+    0xE4, draw,    0,     0x00,                 \
     TERMINATOR
 
 #define PROC_REGS_LIST       \
@@ -122,10 +95,14 @@ typedef uint32_t elm_t;
 
 static const cmd_code_t SECOND_BYTE_MASK = (cmd_code_t)0xFF00;
 static const cmd_code_t LAST_BYTE_MASK   = (cmd_code_t)0x00FF;
-static const unsigned char IMMEDIATE_MASK = (cmd_code_t)0x01;
-static const unsigned char REGISTER_MASK  = (cmd_code_t)0x02;
-static const unsigned char RAM_MASK       = (cmd_code_t)0x04;
-static const unsigned char INDEX_MASK     = (cmd_code_t)0x08;
+
+static const unsigned char IMMEDIATE_MASK = 0x01;
+static const unsigned char REGISTER_MASK  = 0x02;
+static const unsigned char RAM_MASK       = 0x04;
+static const unsigned char MARK_MASK      = 0x08;
+
+static const unsigned char RVALUE_MASK    = 0xEE;
+static const unsigned char LVALUE_MASK    = 0xE4;
 
 #define MAXARGN 256
 static const size_t PROC_REGS_NUMBER = 512;
@@ -133,6 +110,23 @@ static const size_t PROC_RAM_SIZE = 10000;
 // static const size_t PROC_VRAM_SIZE = 10000; // FUCK: separate
 static const int DRAW_WIDTH = 100;
 static const int DRAW_HEIGHT = 100;
+
+#define COMMAND_ENUM_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ , CAT(CMD_, name) = (cmd_code_t) code
+enum command_nums {
+    // Expands to [ CMD_unknown = (cmd_code_t) 0xff, CMD_hlt = (cmd_code_t) 0x00, ... ]
+    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, COMMAND_ENUM_PUSHEND, PROC_CMD_LIST)))
+};
+#undef COMMAND_ENUM_PUSHEND
+
+#define REGISTER_ENUM_PUSHEND(ind, name, ...) __VA_ARGS__ , CAT(REG_, name) = (size_t) ind
+enum reg_num_t {
+    // FIRST MAXARGN (256) regs are reserved!!! (do not touch)
+    // Expands to [ REG_AX = (size_t) 256, REG_BX = (size_t) 257, ... ]
+    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, REGISTER_ENUM_PUSHEND, PROC_REGS_LIST)))
+};
+#undef REGISTER_ENUM_PUSHEND
+
+#endif // SPU_HEADER_H
 
 // LEGACY
 // typedef struct {
@@ -143,17 +137,10 @@ static const int DRAW_HEIGHT = 100;
 // } command_t;
 // #define COMMAND_STRUCT_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ , {(cmd_code_t) code, QUOTE(name), argn, (unsigned char) args}
 // static const command_t proc_commands_list[] = {
-//     // Expands to [ {(cmd_code_t) 0xff, "unknown", (unsigned char) 0x00}, {(cmd_code_t) 0x00, "hlt", (unsigned char) 0x01}, ... ]
+//     // Expands to [ {(cmd_code_t) 0xff, "unknown", (unsigned char) 0x00}, {(cmd_code_t) 0x00, "hlt", (unsigned char) 0x00}, ... ]
 //     EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, COMMAND_STRUCT_PUSHEND, PROC_CMD_LIST)))
 // };
 // #undef COMMAND_STRUCT_PUSHEND
-
-#define COMMAND_ENUM_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ , CAT(CMD_, name) = (cmd_code_t) code
-enum command_nums {
-    // Expands to [ CMD_unknown = (cmd_code_t) 0xff, CMD_hlt = (cmd_code_t) 0x00, ... ]
-    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, COMMAND_ENUM_PUSHEND, PROC_CMD_LIST)))
-};
-#undef COMMAND_ENUM_PUSHEND
 
 // LEGACY
 // typedef struct {
@@ -166,13 +153,3 @@ enum command_nums {
 //     EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, REGISTER_STRUCT_PUSHEND, PROC_REGS_LIST)))
 // };
 // #undef REGISTER_STRUCT_PUSHEND
-
-#define REGISTER_ENUM_PUSHEND(ind, name, ...) __VA_ARGS__ , CAT(REG_, name) = (char) ind
-enum reg_num_t {
-    // FIRST MAXARGN(256) regs are reserved!!! (do not touch)
-    // Expands to [ REG_AX = (char) 1, REG_BX = (char) 2, ... ]
-    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, REGISTER_ENUM_PUSHEND, PROC_REGS_LIST)))
-};
-#undef REGISTER_ENUM_PUSHEND
-
-#endif // SPU_HEADER_H

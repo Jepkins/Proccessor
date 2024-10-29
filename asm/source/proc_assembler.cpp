@@ -6,6 +6,7 @@
 #include "proc_assembler.h"
 #include "spu_header.h"
 #include "cpp_preprocessor_logic.h"
+#include "mytimer.h"
 
 StartConfig run_conds;
 
@@ -57,7 +58,7 @@ int main(int argc, char** argv)
     asmblr_setup(argc, argv, &run_conds);
 
     translate(run_conds.output_file, run_conds.input_file);
-    t.end();
+    printf("TIME = %ldmks\n", t.time());
     return 0;
 }
 
@@ -104,70 +105,36 @@ static int translate (const char* dst_filename, const char* src_filename)
             error_met = true;
             continue;
         }
-
-        switch (cmd_code & LAST_BYTE_MASK)
+        args_t args[MAXARGN] = {};
+        size_t argn = (size_t)-1;
+        if ((argn = (size_t)parse_args(asmblr, cmd_code, args, src)) == (size_t)-1)
         {
-        CASE_JUMP_CALL
-        (
-            char jump_mark[MAXWRDLEN] = {};
-            if (!fscanf(src, "%" QUOTE(MAXWRDLEN) "s", jump_mark) || jump_mark[0] != ':')
-            {
-                fseek(src, -(int)strlen(jump_mark), SEEK_CUR);
-                ERRMSG("Expected mark after %s", cmd_word);
-                error_met = true;
-                continue;
-            }
-            size_t mark_ind = find_mark(asmblr, jump_mark);
-            if (mark_ind == (size_t)-1)
-            {
-                add_mark(asmblr, jump_mark, (size_t)-1);
-                mark_ind = dynarr_curr_size(asmblr->marks) - 1;
-            }
-            size_t mark_ip = ((mark_t*)dynarr_see(asmblr->marks, mark_ind))->ip;
-
-            cmd_code |= (1 << 8); // 1 arg
-            unsigned char type = INDEX_MASK;
-            dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
-            asmblr->ip += sizeof(cmd_code);
-            dynarr_push(asmblr->code, &type, sizeof(type));
-            asmblr->ip += sizeof(type);
-            if (mark_ip == (size_t)-1)
-            {
-                fixup_t new_fixup = {mark_ind, asmblr->ip};
-                stack_push(asmblr->fixups, &new_fixup);
-            }
-            dynarr_push(asmblr->code, &mark_ip, sizeof(mark_ip));
-            asmblr->ip += sizeof(mark_ip);
-            break;
-        )
-        default:
-        {
-            args_t args[MAXARGN] = {};
-            int argn = -1;
-            if ((argn = parse_args(cmd_code, args, src)) == -1)
-            {
-                error_met = true;
-                continue;
-            }
-            cmd_code |= (unsigned char)argn << 8;
-            dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
-            asmblr->ip += sizeof(cmd_code);
-            for (int i = 0; argn > 0; i++, argn--)
-            {
-                dynarr_push(asmblr->code, &args[i].type, sizeof(args[i].type));
-                asmblr->ip += sizeof(args[i].type);
-                if (args[i].type & IMMEDIATE_MASK)
-                {
-                    dynarr_push(asmblr->code, &args[i].val, sizeof(args[i].val));
-                    asmblr->ip += sizeof(args[i].val);
-                }
-                if (args[i].type & REGISTER_MASK)
-                {
-                    dynarr_push(asmblr->code, &args[i].ind, sizeof(args[i].ind));
-                    asmblr->ip += sizeof(args[i].ind);
-                }
-            }
+            error_met = true;
+            continue;
         }
+        cmd_code |= (unsigned char)argn << 8;
+        dynarr_push(asmblr->code, &cmd_code, sizeof(cmd_code));
+        asmblr->ip += sizeof(cmd_code);
+        for (int i = 0; argn > 0; i++, argn--)
+        {
+            dynarr_push(asmblr->code, &args[i].type, sizeof(args[i].type));
+            asmblr->ip += sizeof(args[i].type);
+            if (args[i].type & MARK_MASK)
+            {
+                dynarr_push(asmblr->code, &args[i].ind, sizeof(args[i].ind));
+                asmblr->ip += sizeof(args[i].ind);
+                continue;
+            }
+            if (args[i].type & IMMEDIATE_MASK)
+            {
+                dynarr_push(asmblr->code, &args[i].val, sizeof(args[i].val));
+                asmblr->ip += sizeof(args[i].val);
+            }
+            if (args[i].type & REGISTER_MASK)
+            {
+                dynarr_push(asmblr->code, &args[i].ind, sizeof(args[i].ind));
+                asmblr->ip += sizeof(args[i].ind);
+            }
         }
     }
     fclose(src);
@@ -210,45 +177,6 @@ static cmd_code_t get_cmd_code(const char* cmd_word)
 }
 #undef ASMBLR_STRCMP_PUSHEND
 
-static bool add_mark(asmblr_state_t* asmblr, char* name, size_t ip)
-{
-    size_t i = find_mark(asmblr, name);
-
-    if (i == (size_t)-1)
-    {
-        mark_t new_mark = {{}, ip};
-        strcpy(new_mark.name, name);
-        dynarr_push(asmblr->marks, &new_mark);
-    }
-    else
-    {
-        if (((mark_t*)dynarr_see(asmblr->marks, i))->ip != (size_t)-1)
-        {
-            printf("Multiple mark definition: %s\n", ((mark_t*)dynarr_see(asmblr->marks, i))->name);
-            return 0;
-        }
-        else
-        {
-            ((mark_t*)dynarr_see(asmblr->marks, i))->ip = ip;
-            // printf("add_mark_ip = %lu\n", ip);
-        }
-    }
-    return 1;
-}
-
-static size_t find_mark(asmblr_state_t* asmblr, const char* name)
-{
-    size_t i = 0;
-    size_t marks_num = dynarr_curr_size(asmblr->marks);
-
-    while (i < marks_num && strcmp(name, ((mark_t*)dynarr_see(asmblr->marks, i))->name) != 0)
-        i++;
-
-    if(i == marks_num)
-        return (size_t)-1;
-
-    return i;
-}
 
 #define PARSE_ARGS_IF_PUSHEND(index, name, ...) __VA_ARGS__                     \
     if(strcmp(reg, QUOTE(name)) == 0)                                           \
@@ -266,18 +194,21 @@ static size_t find_mark(asmblr_state_t* asmblr, const char* name)
         continue;                                                               \
     }
 
-static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
+static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args, FILE* src)
 {
     unsigned int poss_args = get_possible_args(cmd_code);
     unsigned int max_seqn = get_max_seqn(cmd_code);
-    unsigned int argn_in_seq = 0;
-    for (unsigned int poss_args_temp = poss_args; poss_args_temp != 0; poss_args_temp <<= 8)
-        argn_in_seq++;
-
-    assert(poss_args && "invalid cmd_code");
-
-    if (max_seqn == 0)
+    if (max_seqn == 0 || poss_args == 0)
         return 0;
+
+    if (poss_args == 0x01)
+    {
+        return parse_markarg(asmblr, args, src);
+    }
+
+    unsigned int argn_in_seq = 0;
+    for (unsigned int poss_args_temp = poss_args; poss_args_temp != 0; poss_args_temp >>= 8)
+        argn_in_seq++;
 
     bool error_met = false;
     bool break_flag = false;
@@ -292,6 +223,7 @@ static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
             fscanf(src, "%s", argword);
             size_t len = strlen(argword);
             assert(len != 0 && "invalid argword");
+            assert(!(poss_args_temp & 0x01) && "Invalid cmd list");
             bool do_ram  = false;
             bool imd_met = false;
             bool reg_met = false;
@@ -306,7 +238,7 @@ static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
                     continue;
                 }
                 do_ram = true;
-                len -= 1;
+                len--;
             }
             for(size_t i = do_ram; i < len;)
             {
@@ -357,6 +289,8 @@ static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
                 char reg[3] = {};
                 if (len - i >= 2)
                     sscanf(argword + i, "%2s", reg);
+                else
+                    goto notanarg;
 
                 // Expands to   if(strcmp(reg, "AX") == 0) { ... continue;}
                 //              if(strcmp(reg, "BX") == 0) { ... continue;}
@@ -364,6 +298,12 @@ static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
                 EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PARSE_ARGS_IF_PUSHEND, PROC_REGS_LIST, )))
 
                 // Not an argument
+                notanarg:
+                if (i != do_ram)
+                {
+                    error_met = true;
+                    ERRMSG("Invalid argument: %s", argword);
+                }
                 if (argnum_in_seq != 0)
                 {
                     error_met = true;
@@ -392,6 +332,7 @@ static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
                 error_met = true;
                 continue;
             }
+
             if (imd_met) args[argnum].type |= IMMEDIATE_MASK;
             if (reg_met) args[argnum].type |= REGISTER_MASK;
             if (do_ram)  args[argnum].type |= RAM_MASK;
@@ -411,7 +352,8 @@ static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
     }
     if (argnum == MAXARGN - 1)
     {
-        ERRMSG("Potentially exceeded MAXARGN for (code)" CMD_CODE_FORMAT, cmd_code & LAST_BYTE_MASK);
+        ERRMSG("Exceeded MAXARGN for (code)" CMD_CODE_FORMAT, cmd_code & LAST_BYTE_MASK);
+        error_met = true;
     }
     // printf("code = %hX, poss_args = %X, max_seqn = %u, gotseq = %u\n", cmd_code, poss_args, max_seqn, seqnum);
     if (error_met)
@@ -419,6 +361,77 @@ static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src)
     return argnum;
 }
 #undef PARSE_ARGS_IF_PUSHEND
+
+static int parse_markarg(asmblr_state_t* asmblr, args_t* args, FILE* src)
+{
+    char jump_mark[MAXWRDLEN] = {};
+    if (!fscanf(src, "%" QUOTE(MAXWRDLEN) "s", jump_mark) || jump_mark[0] != ':')
+    {
+        fseek(src, -(int)strlen(jump_mark), SEEK_CUR);
+        ERRMSG("Expected mark, got: %s", jump_mark);
+        return -1;
+    }
+    size_t mark_ind = find_mark(asmblr, jump_mark);
+    if (mark_ind == (size_t)-1)
+    {
+        if (!add_mark(asmblr, jump_mark, (size_t)-1))
+        {
+            return -1;
+        }
+        mark_ind = dynarr_curr_size(asmblr->marks) - 1;
+    }
+    size_t mark_ip = ((mark_t*)dynarr_see(asmblr->marks, mark_ind))->ip;
+
+
+    if (mark_ip == (size_t)-1)
+    {
+        fixup_t new_fixup = {mark_ind, asmblr->ip + sizeof(cmd_code_t) + sizeof(argtype_t)};
+        stack_push(asmblr->fixups, &new_fixup);
+    }
+    args[0].type |= MARK_MASK;
+    args[0].ind   = mark_ip;
+    return 1;
+}
+
+static bool add_mark(asmblr_state_t* asmblr, char* name, size_t ip)
+{
+    size_t i = find_mark(asmblr, name);
+
+    if (i == (size_t)-1)
+    {
+        mark_t new_mark = {{}, ip};
+        strcpy(new_mark.name, name);
+        dynarr_push(asmblr->marks, &new_mark);
+    }
+    else
+    {
+        if (((mark_t*)dynarr_see(asmblr->marks, i))->ip != (size_t)-1)
+        {
+            printf("Multiple mark definition: %s\n", ((mark_t*)dynarr_see(asmblr->marks, i))->name);
+            return 0;
+        }
+        else
+        {
+            ((mark_t*)dynarr_see(asmblr->marks, i))->ip = ip;
+            // printf("add_mark_ip = %lu\n", ip);
+        }
+    }
+    return 1;
+}
+
+static size_t find_mark(asmblr_state_t* asmblr, const char* name)
+{
+    size_t i = 0;
+    size_t marks_num = dynarr_curr_size(asmblr->marks);
+
+    while (i < marks_num && strcmp(name, ((mark_t*)dynarr_see(asmblr->marks, i))->name) != 0)
+        i++;
+
+    if(i == marks_num)
+        return (size_t)-1;
+
+    return i;
+}
 
 #define GET_POSS_ARGS_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ case code: {return args;}
 static unsigned int get_possible_args(cmd_code_t code)

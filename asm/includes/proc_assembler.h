@@ -6,7 +6,6 @@
 #include "stack.h"
 
 #define MAXWRDLEN  15
-#define CASE_JUMP_CALL(...) case CMD_call: case CMD_jmp: case CMD_ja: case CMD_jae: case CMD_jb: case CMD_jbe: case CMD_je: case CMD_jne: {__VA_ARGS__}
 
 typedef struct {
     char name[MAXWRDLEN];
@@ -25,8 +24,9 @@ typedef struct {
     size_t ip;
 } asmblr_state_t;
 
+typedef unsigned char argtype_t;
 typedef struct {
-    unsigned char type;
+    argtype_t type;
     elm_t val;
     size_t ind;
 } args_t;
@@ -41,7 +41,8 @@ static void skip_line(FILE* src);
 static cmd_code_t get_cmd_code(const char* cmd_word);
 static bool add_mark(asmblr_state_t* asmblr, char* name, size_t ip);
 static size_t find_mark(asmblr_state_t* asmblr, const char* name);
-static int parse_args(cmd_code_t cmd_code, args_t* args, FILE* src);
+static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args, FILE* src);
+static int parse_markarg(asmblr_state_t* asmblr, args_t* args, FILE* src);
 static unsigned int get_possible_args(cmd_code_t code);
 static unsigned int get_max_seqn(cmd_code_t code);
 
