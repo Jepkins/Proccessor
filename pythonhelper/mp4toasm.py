@@ -5,7 +5,7 @@ import math
 SCREEN_WIDTH = 480
 SCREEN_HEIGHT = 360
 
-MEMSET_LIMIT = 8
+MEMSET_LIMIT = 150
 
 def get_int_color(bgr, do_bnw):
     blue = min(bgr[0], 255)

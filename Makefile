@@ -48,12 +48,15 @@ $(ASM_EXEC): make_common make_asm
 
 make_common:
 	@echo $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)')
+	@sleep 0.1
 
 make_proc:
 	@echo $(shell $(MAKE) -s -C $(PROC_DIR) curr=$(PROC_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
+	@sleep 0.1
 
 make_asm:
 	@echo $(shell $(MAKE) -s -C $(ASM_DIR) curr=$(ASM_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
+	@sleep 0.1
 
 code ?= data/code.bin
 source ?= data/test.asm
@@ -72,8 +75,3 @@ compile:
 clean:
 	@rm -rf -d $(BUILD_DIR)
 
-echo:
-	@echo $(COMMON_OBJECTS)
-	@echo $(PROC_OBJECTS)
-	@echo $(ASM_OBJECTS)
-	@echo $(COMMON_INCLUDES)

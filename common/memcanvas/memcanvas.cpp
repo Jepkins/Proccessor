@@ -57,15 +57,15 @@ int MemCanvas::Quit()
     return 0;
 }
 
-#define CMP_BLOCK 16
 int MemCanvas::Update()
 {
     if (!inited)
         return 1;
     int ind = 0;
+    const int CMP_BLOCK = width * height / 1000;
     for (; ind <  width * height - CMP_BLOCK; ind += CMP_BLOCK)
     {
-        if (memcmp(&current[ind], &pixs[ind], CMP_BLOCK * sizeof(pix_t)) != 0)
+        if (memcmp(&current[ind], &pixs[ind], (size_t)CMP_BLOCK * sizeof(pix_t)) != 0)
         {
             for (int i = 0; i < CMP_BLOCK; i++)
             {

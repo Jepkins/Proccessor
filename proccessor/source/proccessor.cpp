@@ -517,10 +517,11 @@ static void proc_execute_sleep  (proc_t* proc)
 static void proc_execute_slpdif  (proc_t* proc)
 {
     size_t time = proc->timer.mictime();
-    if (time < (size_t) ARG_(0))
-    {
-        std::this_thread::sleep_for(std::chrono::microseconds((size_t) ARG_(0) - time));
-    }
+    // MIND: undo
+    // if (time < (size_t) ARG_(0))
+    // {
+    //     std::this_thread::sleep_for(std::chrono::microseconds((size_t) ARG_(0) - time));
+    // }
     proc->timer.start();
 }
 // END: MISC
