@@ -2,11 +2,10 @@ import cv2 as cv
 import argparse
 import math
 
-SCREEN_WIDTH = 100
-SCREEN_HEIGHT = 100
+SCREEN_WIDTH = 480
+SCREEN_HEIGHT = 360
 
-VIDEO_WIDTH = 200
-VIDEO_HEIGHT = 150
+MEMSET_LIMIT = 8
 
 def get_int_color(bgr, do_bnw):
     blue = min(bgr[0], 255)
@@ -14,17 +13,24 @@ def get_int_color(bgr, do_bnw):
     red = min(bgr[2], 255)
     if do_bnw:
         if blue | green | red > 100:
-            return 0xff000000
-        else:
             return 0xffffffff
+        else:
+            return 0xff000000
 
     return int((255 << 24) | (blue << 16) | (green << 8) | red)
+
+def append_same (output, index, same_clr_len, curr_same_clr):
+    if same_clr_len < MEMSET_LIMIT:
+        for same_ind in range(same_clr_len):
+            output.append(f"mov [{index + same_ind}] {curr_same_clr}")
+    else:
+        output.append(f"mst [{index}] {curr_same_clr} {same_clr_len}")
 
 def process_video(input_file, output_file, do_bnw):
     video_capture = cv.VideoCapture(input_file)
 
     fps = int(video_capture.get(cv.CAP_PROP_FPS))
-    delay = 1000 // fps
+    delay = 1e6 // fps
     frame_count = int(video_capture.get(cv.CAP_PROP_FRAME_COUNT))
     current_colors = [None] * (SCREEN_WIDTH * SCREEN_HEIGHT)
 
@@ -37,20 +43,35 @@ def process_video(input_file, output_file, do_bnw):
         if not success:
             continue
 
+        same_clr_len = 0
+        curr_same_clr = 0
+        index = 0
         frame = cv.resize(frame, (SCREEN_WIDTH, SCREEN_HEIGHT), interpolation=cv.INTER_LANCZOS4)
         for y in range(SCREEN_WIDTH):
             for x in range(SCREEN_HEIGHT):
                 bgr_color = frame[x, y]
                 color = get_int_color(bgr_color, do_bnw)
 
-                index = y * SCREEN_HEIGHT + x
+                if color == current_colors[index + same_clr_len]:
+                    append_same (output, index, same_clr_len, curr_same_clr)
+                    index += same_clr_len + 1
+                    same_clr_len = 0
+                    curr_same_clr = color
+                else:
+                    current_colors[index + same_clr_len] = color
+                    if color != curr_same_clr:
+                        append_same (output, index, same_clr_len, curr_same_clr)
+                        index += same_clr_len
+                        same_clr_len = 1
+                        curr_same_clr = color
+                    else:
+                        same_clr_len += 1
 
-                if current_colors[index] != color:
-                    output.append(f"mov [{index}] {color}")
-                    current_colors[index] = color
+        append_same (output, index, same_clr_len, curr_same_clr)
+
 
         output.append("draw")
-        output.append(f"sleep {delay}")
+        output.append(f"slpdif {delay}")
     output.append("hlt")
 
     with open(output_file, "w") as file:

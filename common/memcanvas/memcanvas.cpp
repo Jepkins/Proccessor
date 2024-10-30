@@ -1,5 +1,6 @@
 #include <iostream>
 #include <stdint.h>
+#include <assert.h>
 #include "memcanvas.h"
 
 using namespace std;
@@ -14,13 +15,11 @@ using namespace std;
 #define SCALE(val) (decltype(val))((double)val * scl)
 #define UNSCALE(val) (decltype(val))((double)val / scl)
 
-int MemCanvas::Init(pix_t* pixs_ptr, int des_width, int des_height, double scale, const char* name)
+int MemCanvas::Init(pix_t* pixs_ptr, int des_width, int des_height, const char* name)
 {
     if (inited)
         return -1;
-    if (des_width <= 0 && des_height <= 0)
-        return -2;
-    if (scale < 0.1)
+    if (des_width <= 0 || des_height <= 0)
         return -2;
     if (pixs_ptr == nullptr)
         return -3;
@@ -28,12 +27,14 @@ int MemCanvas::Init(pix_t* pixs_ptr, int des_width, int des_height, double scale
     width = des_width;
     height = des_height;
     pixs = (pix_t*) pixs_ptr;
-    scl = scale;
+
+    current = (pix_t*)calloc((size_t)(width * height), sizeof(pix_t));
+    assert(current && "Allocation error");
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
         return 1;
 
-    win = SDL_CreateWindow(name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCALE(width), SCALE(height), SDL_WINDOW_SHOWN);
+    win = SDL_CreateWindow(name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
     rndr = SDL_CreateRenderer(win, -1, 0);
     SDL_SetRenderDrawColor(rndr, 0, 0, 0, 0);
     SDL_RenderClear(rndr);
@@ -51,25 +52,40 @@ int MemCanvas::Quit()
     SDL_DestroyWindow(win);
     SDL_DestroyRenderer(rndr);
     SDL_Quit();
-
+    free(current);
     inited = false;
     return 0;
 }
 
+#define CMP_BLOCK 16
 int MemCanvas::Update()
 {
-    for (int i = 0; i <  SCALE(width); i++)
-    for (int j = 0; j < SCALE(height); j++)
+    if (!inited)
+        return 1;
+    int ind = 0;
+    for (; ind <  width * height - CMP_BLOCK; ind += CMP_BLOCK)
     {
-        pix_t pix = pixs[UNSCALE(i) * height + UNSCALE(j)];
-        clr_t clr = GET_CLR(pix);
+        if (memcmp(&current[ind], &pixs[ind], CMP_BLOCK * sizeof(pix_t)) != 0)
+        {
+            for (int i = 0; i < CMP_BLOCK; i++)
+            {
+                pix_t new_pix = pixs[ind+i];
+                clr_t clr = GET_CLR(new_pix);
+                SDL_SetRenderDrawColor(rndr, clr.r, clr.g, clr.b, clr.o);
+                SDL_RenderDrawPoint(rndr, (ind+i) / height, (ind+i) % height);
+                current[ind+i] = new_pix;
+            }
+        }
+    }
+    for (int i = 0; i < width * height - ind; i++)
+    {
+        pix_t new_pix = pixs[ind+i];
+        clr_t clr = GET_CLR(new_pix);
         SDL_SetRenderDrawColor(rndr, clr.r, clr.g, clr.b, clr.o);
-        SDL_RenderDrawPoint(rndr, i, j);
-        // const SDL_Rect rect = {SCALE(i), SCALE(j), (int)round(scl), (int)round(scl)};
-        // SDL_FillRect(srf, &rect, pix);
+        SDL_RenderDrawPoint(rndr, (ind+i) / height, (ind+i) % height);
+        current[ind+i] = new_pix;
     }
     SDL_RenderPresent(rndr);
-    // SDL_UpdateWindowSurface(win);
     return 0;
 }
 

@@ -28,6 +28,8 @@ typedef struct {
     elm_t*  ram;
     stack_t* return_ips;
     MemCanvas* cnv;
+    timer_cl timer;
+    bool stop = false;
 } proc_t;
 
 static int proc_run();
@@ -35,8 +37,6 @@ static size_t proc_load (const char* code_filename, proc_t* proc);
 static cmd_code_t proc_execute_next(proc_t* proc);
 static void  proc_getfullcmd (proc_t* proc);
 static void proc_getargs (proc_t* proc);
-
-static const double IMAGE_SCALE = 4;
 
 #define PROC_EXECUTE_PROTOTYPE_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ static void PRIMITIVE_CAT(proc_execute_,name) (proc_t* proc);
 // Expands to [ static void proc_execute_push (proc_t* proc); static void proc_execute_pop (proc_t* proc); ... ]

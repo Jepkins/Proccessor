@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     if (proc_run() != 0)
         return 1;
     printf("done\n");
-    printf("TIME = %ldmks\n", t.time());
+    printf("TIME = %lu mks\n", t.mictime());
     return 0;
 }
 
@@ -93,8 +93,21 @@ static int proc_run()
         return 1;
     }
     proc->code_size = code_size;
-    while (proc->ip < code_size)
+    while (!proc->stop)
     {
+        if (run_conds.do_video)
+        {
+            SDL_Event event;
+            while(SDL_PollEvent(&event))
+            {
+                if (event.type == SDL_QUIT)
+                {
+                    run_conds.do_video = false;
+                    proc->cnv->Quit();
+                }
+            }
+        }
+
         cmd_code_t cmd = CMD_hlt;
         cmd = proc_execute_next(proc);
 
@@ -106,29 +119,12 @@ static int proc_run()
     {
         proc->cnv->Quit();
     }
+    proc_delete (proc);
     return 0;
 }
 
 static size_t proc_load (const char* code_filename, proc_t* proc)
 {
-    if (run_conds.do_video)
-    {
-        if (PROC_RAM_SIZE * sizeof(elm_t) < DRAW_WIDTH * DRAW_HEIGHT * sizeof(pix_t))
-        {
-            printf("Not enough ram to draw!!!\n");
-            run_conds.do_video = false;
-        }
-        else
-        {
-            proc->cnv = new MemCanvas;
-            int init_ret = proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, IMAGE_SCALE, "RAM[]");
-            if (init_ret != 0)
-            {
-                printf("Failed to initialize canvas!\n");
-                run_conds.do_video = false;
-            }
-        }
-    }
 
     FILE* istream = fopen(code_filename, "rb");
     if (!istream)
@@ -158,8 +154,30 @@ static size_t proc_load (const char* code_filename, proc_t* proc)
         printf("Failed to read code\n");
         return (size_t)-1;
     }
-
     fclose(istream);
+
+    if (run_conds.do_video)
+    {
+        if (PROC_RAM_SIZE * sizeof(elm_t) < DRAW_WIDTH * DRAW_HEIGHT * sizeof(pix_t))
+        {
+            printf("Not enough ram to draw!!!\n");
+            run_conds.do_video = false;
+            return (size_t)-1;
+        }
+        else
+        {
+            proc->cnv = new MemCanvas;
+            int init_ret = proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, "RAM[]");
+            if (init_ret != 0)
+            {
+                printf("Failed to initialize canvas!\n");
+                run_conds.do_video = false;
+                return (size_t)-1;
+            }
+        }
+    }
+
+    proc->timer.start();
     return code_size;
 }
 static bool check_header (spu_header_t* head)
@@ -283,7 +301,7 @@ static void proc_execute_unknown(proc_t* proc)
 }
 static void proc_execute_hlt(proc_t* proc)
 {
-    proc_delete(proc);
+    proc->stop = true;
     return;
 }
 
@@ -373,10 +391,11 @@ static void proc_execute_mov(proc_t* proc)
 }
 static void proc_execute_mst(proc_t* proc)
 {
-    for (size_t i = 0; i < (size_t)ARG_(2); i++)
-    {
-        *(&ARG_(0) + i) = ARG_(1);
-    }
+    // for (size_t i = 0; i < (size_t)ARG_(2); i++)
+    // {
+    //     *(&ARG_(0) + i) = ARG_(1);
+    // }
+    std::fill(&ARG_(0), (&ARG_(0) + (size_t)ARG_(2)), ARG_(1));
 }
 // END: MEMOPERS
 
@@ -485,14 +504,24 @@ static void proc_execute_draw  (proc_t* proc)
 {
     if (!run_conds.do_video)
     {
-        printf("Trying to draw with video disabled! Not executed.\n");
+        printf("Trying to draw with video disabled! Stop.\n");
+        proc->stop = true;
         return;
     }
     proc->cnv->Update();
 }
 static void proc_execute_sleep  (proc_t* proc)
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds((size_t) ARG_(0)));
+    std::this_thread::sleep_for(std::chrono::microseconds((size_t) ARG_(0)));
+}
+static void proc_execute_slpdif  (proc_t* proc)
+{
+    size_t time = proc->timer.mictime();
+    if (time < (size_t) ARG_(0))
+    {
+        std::this_thread::sleep_for(std::chrono::microseconds((size_t) ARG_(0) - time));
+    }
+    proc->timer.start();
 }
 // END: MISC
 

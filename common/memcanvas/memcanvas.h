@@ -21,7 +21,7 @@ const char Default_MemCanvas_Name[] = "MemCanv";
 
 class MemCanvas {
 public:
-    int Init(pix_t* pixs_ptr, int des_width, int des_height, double scale = 1, const char* name = Default_MemCanvas_Name);
+    int Init(pix_t* pixs_ptr, int des_width, int des_height, const char* name = Default_MemCanvas_Name);
     int Quit();
     int Update();
 private:
@@ -30,6 +30,7 @@ private:
     int height = 0;
     double scl = 0;
     pix_t*        pixs = nullptr;
+    pix_t*     current = nullptr;
     SDL_Window    *win = nullptr;
     SDL_Surface   *srf = nullptr;
     SDL_Renderer *rndr = nullptr;

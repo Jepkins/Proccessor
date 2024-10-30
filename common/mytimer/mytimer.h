@@ -3,25 +3,41 @@
 
 #include <stdio.h>
 #include <time.h>
+#include <chrono>
+#include <ctime>
+#include <cmath>
 
 class timer_cl
 {
     private:
-        long int mark = 0;
+        std::chrono::time_point<std::chrono::system_clock> mark = {};
         bool started = false;
     public:
         void start()
         {
-            mark = clock();
+            mark = std::chrono::system_clock::now();
             started = true;
         }
-        long int time()
+        auto now()
         {
-            return clock() - mark;
+            return std::chrono::system_clock::now();
         }
-        void end()
+        size_t sectime()
         {
-            started = false;
+            return mictime() / 1'000'000;
+        }
+        size_t miltime()
+        {
+            return mictime() / 1'000;
+        }
+        size_t mictime()
+        {
+            if (started)
+            {
+                return (size_t)std::chrono::duration_cast<std::chrono::microseconds>(now() - mark).count();
+            }
+            else
+                return 0;
         }
 };
 

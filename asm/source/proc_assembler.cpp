@@ -55,10 +55,11 @@ int main(int argc, char** argv)
 {
     timer_cl t;
     t.start();
-    asmblr_setup(argc, argv, &run_conds);
 
+    asmblr_setup(argc, argv, &run_conds);
     translate(run_conds.output_file, run_conds.input_file);
-    printf("TIME = %ldmks\n", t.time());
+
+    printf("TIME = %lu mks\n", t.mictime());
     return 0;
 }
 
@@ -222,7 +223,6 @@ static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args,
             char argword[MAXWRDLEN] = {};
             fscanf(src, "%s", argword);
             size_t len = strlen(argword);
-            assert(len != 0 && "invalid argword");
             assert(!(poss_args_temp & 0x01) && "Invalid cmd list");
             bool do_ram  = false;
             bool imd_met = false;
@@ -240,6 +240,8 @@ static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args,
                 do_ram = true;
                 len--;
             }
+            if (len == 0)
+                break_flag = true;
             for(size_t i = do_ram; i < len;)
             {
                 if (argword[i] == '+')

@@ -28,6 +28,7 @@ typedef struct {
 /*  |     |        |      |                  */ \
     0xFF, unknown, 0,     0x00,                 \
     0xF0, sleep,   1,     0xEE,                 \
+    0xF1, slpdif,  1,     0xEE,                 \
     0x00, hlt,     0,     0x00,                 \
     0x01, push,    10,    0xEE,                 \
     0x02, pop,     10,    0xE4,                 \
@@ -106,7 +107,7 @@ static const unsigned char LVALUE_MASK    = 0xE4;
 
 #define MAXARGN 256
 static const size_t PROC_REGS_NUMBER = 512;
-static const size_t PROC_RAM_SIZE = 10000;
+static const size_t PROC_RAM_SIZE = 1'000'000; // 1MB
 // static const size_t PROC_VRAM_SIZE = 10000; // FUCK: separate
 static const int DRAW_WIDTH = 100;
 static const int DRAW_HEIGHT = 100;
