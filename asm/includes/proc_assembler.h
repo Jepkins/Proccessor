@@ -48,6 +48,6 @@ static unsigned int get_max_seqn(cmd_code_t code);
 
 static size_t get_curr_line(FILE* fstream);
 static bool execute_fixup(asmblr_state_t* asmblr);
-static void write_code(const char* dst_filename, dynarr_t* code);
+static int write_code(const char* dst_filename, dynarr_t* code);
 
 #endif // PROC_ASSEMBLER_H

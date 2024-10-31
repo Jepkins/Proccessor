@@ -89,7 +89,7 @@ static int proc_run()
     size_t code_size = proc_load(run_conds.input_file, proc);
     if (code_size == (size_t)-1)
     {
-        printf("Failed to load. Break\n");
+        fprintf(stderr,  "Failed to load. Break\n");
         return 1;
     }
     proc->code_size = code_size;
@@ -109,6 +109,7 @@ static int proc_run()
         }
 
         cmd_code_t cmd = CMD_hlt;
+
         cmd = proc_execute_next(proc);
 
         if (cmd == CMD_hlt)
@@ -118,6 +119,7 @@ static int proc_run()
     if (run_conds.do_video)
     {
         proc->cnv->Quit();
+        delete(proc->cnv);
     }
     proc_delete (proc);
     return 0;
@@ -129,7 +131,7 @@ static size_t proc_load (const char* code_filename, proc_t* proc)
     FILE* istream = fopen(code_filename, "rb");
     if (!istream)
     {
-        printf("Could not open file: %s\n", code_filename);
+        fprintf(stderr,  "Could not open file: %s\n", code_filename);
         return (size_t)-1;
     }
 
@@ -137,7 +139,7 @@ static size_t proc_load (const char* code_filename, proc_t* proc)
     fread(&head, sizeof(head), 1, istream);
     if (ferror(istream))
     {
-        printf("Failed to read spu_header\n");
+        fprintf(stderr,  "Failed to read spu_header\n");
         return (size_t)-1;
     }
     if (!check_header(&head))
@@ -151,7 +153,7 @@ static size_t proc_load (const char* code_filename, proc_t* proc)
     fread(proc->code, sizeof(char), code_size, istream);
     if (ferror(istream))
     {
-        printf("Failed to read code\n");
+        fprintf(stderr,  "Failed to read code\n");
         return (size_t)-1;
     }
     fclose(istream);
@@ -160,17 +162,17 @@ static size_t proc_load (const char* code_filename, proc_t* proc)
     {
         if (PROC_RAM_SIZE * sizeof(elm_t) < DRAW_WIDTH * DRAW_HEIGHT * sizeof(pix_t))
         {
-            printf("Not enough ram to draw!!!\n");
+            fprintf(stderr,  "Not enough ram to draw!!!\n");
             run_conds.do_video = false;
             return (size_t)-1;
         }
         else
         {
             proc->cnv = new MemCanvas;
-            int init_ret = proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, "RAM[]");
+            int init_ret = proc->cnv->Init((pix_t*)proc->ram, DRAW_WIDTH, DRAW_HEIGHT, 2, "RAM[]");
             if (init_ret != 0)
             {
-                printf("Failed to initialize canvas!\n");
+                fprintf(stderr,  "Failed to initialize canvas!\n");
                 run_conds.do_video = false;
                 return (size_t)-1;
             }
@@ -185,12 +187,12 @@ static bool check_header (spu_header_t* head)
     spu_header_t true_head;
     if (strcmp(head->signature, true_head.signature))
     {
-        printf("Failed to check signature: [expected: %s] [got: %s]\n", true_head.signature, head->signature);
+        fprintf(stderr,  "Failed to check signature: [expected: %s] [got: %s]\n", true_head.signature, head->signature);
         return 0;
     }
     if (head->version != true_head.version)
     {
-        printf("Failed to check version: [expected: %lg] [got: %lg]\n", true_head.version, head->version);
+        fprintf(stderr,  "Failed to check version: [expected: %lg] [got: %lg]\n", true_head.version, head->version);
         return 0;
     }
     return 1;
@@ -200,9 +202,8 @@ static bool check_header (spu_header_t* head)
 #define PROC_EXECUTE_CASES_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ case code: {CAT(proc_execute_, name)(proc); break;}
 cmd_code_t proc_execute_next(proc_t* proc)
 {
-    // printf("Entered execute_next\n");
     proc_getfullcmd(proc);
-    // printf("Got instruction: code = %hX, argn = %lu\n", proc->current_cmd.cmd_code, proc->current_cmd.argn);
+// printf("Got %4hX, TIME = %lu\n", proc->current_cmd.cmd_code, proc->timer.mictime());
     switch (proc->current_cmd.cmd_code & LAST_BYTE_MASK)
     {
     // Expands to  case 0xff: {proc_execute_unknown(proc); break;}
@@ -211,7 +212,7 @@ cmd_code_t proc_execute_next(proc_t* proc)
     EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PROC_EXECUTE_CASES_PUSHEND, PROC_CMD_LIST, )))
     default:
     {
-        printf("Unknown command: " CMD_CODE_FORMAT "\n", proc->current_cmd.cmd_code);
+        fprintf(stderr,  "Unknown command: " CMD_CODE_FORMAT "\n", proc->current_cmd.cmd_code);
         assert(0 && "Unknown command");
     }
     }
@@ -223,12 +224,12 @@ cmd_code_t proc_execute_next(proc_t* proc)
 #define ARG_PTR_(n) proc->current_cmd.args[n].ptr
 #define ARG_TYPE_(n) proc->current_cmd.args[n].type
 #define ARGN_ proc->current_cmd.argn
+
 static void proc_getfullcmd (proc_t* proc)
 {
     memcpy(&CMD_CODE_, proc->code + proc->ip, sizeof(CMD_CODE_));
     proc->ip += sizeof(CMD_CODE_);
     ARGN_ = (unsigned char)((CMD_CODE_ & SECOND_BYTE_MASK) >> 8);
-    // printf("code = %hX, argn = %lu\n", CMD_CODE_, ARGN_);
     proc_getargs(proc);
 }
 static void proc_getargs (proc_t* proc)
@@ -238,7 +239,7 @@ static void proc_getargs (proc_t* proc)
         elm_t value = 0;
         size_t ind = 0;
         unsigned char type = 0;
-        // printf("getarg: ip = %lu\n", proc->ip);
+
         memcpy(&type, proc->code + proc->ip, sizeof(type));
         proc->ip += sizeof(type);
         ARG_TYPE_(argi) = type;
@@ -296,7 +297,7 @@ static void proc_getargs (proc_t* proc)
 
 static void proc_execute_unknown(proc_t* proc)
 {
-    printf("Unknown command: " CMD_CODE_FORMAT "\n", CMD_);
+    fprintf(stderr,  "Unknown command: " CMD_CODE_FORMAT "\n", CMD_);
     assert(0 && "Unknown command");
 }
 static void proc_execute_hlt(proc_t* proc)
@@ -391,10 +392,6 @@ static void proc_execute_mov(proc_t* proc)
 }
 static void proc_execute_mst(proc_t* proc)
 {
-    // for (size_t i = 0; i < (size_t)ARG_(2); i++)
-    // {
-    //     *(&ARG_(0) + i) = ARG_(1);
-    // }
     std::fill(&ARG_(0), (&ARG_(0) + (size_t)ARG_(2)), ARG_(1));
 }
 // END: MEMOPERS
@@ -492,7 +489,10 @@ static void proc_execute_dump(proc_t* proc)
     fprintf(stderr, "ram: [ ");
     for (size_t i = 0; i < PROC_RAM_SIZE; i++) fprintf(stderr, "|%2lu: " ELM_T_FORMAT "| ", i, proc->ram[i]);
     fprintf(stderr, "]\n");
+    fprintf(stderr, "---\nData stack:\n");
     stack_dump(proc->stk, _POS_);
+    fprintf(stderr, "---\nReturn ips stack:\n");
+    stack_dump(proc->return_ips, _POS_);
     fprintf(stderr, "regs: [ ");
     for (size_t i = 0; i < PROC_REGS_NUMBER; i++) fprintf(stderr, "|%2lu: " ELM_T_FORMAT "| ", i, proc->regs[i]);
     fprintf(stderr, "]\n");
@@ -504,7 +504,7 @@ static void proc_execute_draw  (proc_t* proc)
 {
     if (!run_conds.do_video)
     {
-        printf("Trying to draw with video disabled! Stop.\n");
+        fprintf(stderr,  "Trying to draw with video disabled! Stop.\n");
         proc->stop = true;
         return;
     }
@@ -517,11 +517,10 @@ static void proc_execute_sleep  (proc_t* proc)
 static void proc_execute_slpdif  (proc_t* proc)
 {
     size_t time = proc->timer.mictime();
-    // MIND: undo
-    // if (time < (size_t) ARG_(0))
-    // {
-    //     std::this_thread::sleep_for(std::chrono::microseconds((size_t) ARG_(0) - time));
-    // }
+    if (time < (size_t) ARG_(0))
+    {
+        std::this_thread::sleep_for(std::chrono::microseconds((size_t) ARG_(0) - time));
+    }
     proc->timer.start();
 }
 // END: MISC

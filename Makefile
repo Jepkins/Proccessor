@@ -47,7 +47,7 @@ $(ASM_EXEC): make_common make_asm
 	@$(CC) $(COMMON_OBJECTS) $(ASM_OBJECTS) -o $@ $(LDFLAGS)
 
 make_common:
-	@echo $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)')
+	@echo $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' d_debug='$(d_debug)')
 	@sleep 0.1
 
 make_proc:

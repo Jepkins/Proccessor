@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "flagging.h"
-// MORON: unavoidable local copy-paste
+
 GetoptResult getopt_custom(int argc, char ** const argv, const char *optstring, getopt_out* opt_out)
 {
     if (opt_out->optind > argc - 1)

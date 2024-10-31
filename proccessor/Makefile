@@ -14,6 +14,7 @@ DEPS = $(addprefix ../, $(addsuffix .d, $(basename $(OBJECTS))))
 CFLAGS += $(addprefix -I, $(INC_DIR)) $(COMMON_INCLUDES)
 
 all: $(addprefix ../, $(OBJECTS))
+	@echo $(CURRENT_DIR): done
 
 -include $(DEPS)
 

@@ -108,7 +108,6 @@ static const unsigned char LVALUE_MASK    = 0xE4;
 #define MAXARGN 256
 static const size_t PROC_REGS_NUMBER = 512;
 static const size_t PROC_RAM_SIZE = 1'000'000; // 1MB
-// static const size_t PROC_VRAM_SIZE = 10000; // FUCK: separate
 static const int DRAW_WIDTH = 100;
 static const int DRAW_HEIGHT = 100;
 
@@ -128,29 +127,3 @@ enum reg_num_t {
 #undef REGISTER_ENUM_PUSHEND
 
 #endif // SPU_HEADER_H
-
-// LEGACY
-// typedef struct {
-//     const cmd_code_t code;
-//     const char name[10];
-//     const unsigned char max_sequence_n;
-//     const unsigned int possible_sequence;
-// } command_t;
-// #define COMMAND_STRUCT_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ , {(cmd_code_t) code, QUOTE(name), argn, (unsigned char) args}
-// static const command_t proc_commands_list[] = {
-//     // Expands to [ {(cmd_code_t) 0xff, "unknown", (unsigned char) 0x00}, {(cmd_code_t) 0x00, "hlt", (unsigned char) 0x00}, ... ]
-//     EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, COMMAND_STRUCT_PUSHEND, PROC_CMD_LIST)))
-// };
-// #undef COMMAND_STRUCT_PUSHEND
-
-// LEGACY
-// typedef struct {
-//     const char ind;
-//     const char name[3];
-// } registers_t;
-// #define REGISTER_STRUCT_PUSHEND(ind, name, ...) __VA_ARGS__ , {(char) ind, QUOTE(name)}
-// static const registers_t proc_registers_list[] = {
-//     // Expands to [ {(char) 1, "AX"}, {(char) 2, "BX"}, ... ]
-//     EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, REGISTER_STRUCT_PUSHEND, PROC_REGS_LIST)))
-// };
-// #undef REGISTER_STRUCT_PUSHEND

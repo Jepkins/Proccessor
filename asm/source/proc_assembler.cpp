@@ -63,7 +63,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-#define ERRMSG(msg, ... /* param */) printf("[%lu]" msg "\n", get_curr_line(src), __VA_ARGS__)
+#define ERRMSG(msg, ... /* param */) fprintf(stderr,  "[%lu]" msg "\n", get_curr_line(src), __VA_ARGS__)
 
 static int translate (const char* dst_filename, const char* src_filename)
 {
@@ -74,7 +74,7 @@ static int translate (const char* dst_filename, const char* src_filename)
     FILE* src = fopen(src_filename, "r");
     if (!src)
     {
-        printf("Could not open file: %s\n", src_filename);
+        fprintf(stderr,  "Could not open file: %s\n", src_filename);
         return -1;
     }
 
@@ -146,18 +146,23 @@ static int translate (const char* dst_filename, const char* src_filename)
     }
     if (error_met)
     {
-        printf("Error, break\n");
+        fprintf(stderr,  "Error, break\n");
         asmblr_state_delete(asmblr);
         return 1;
     }
     if (dynarr_curr_size(asmblr->code) == 0)
     {
-        printf("Empty code, break\n");
+        fprintf(stderr,  "Empty code, break\n");
         return 1;
     }
-    write_code(dst_filename, asmblr->code);
+    if (write_code(dst_filename, asmblr->code) != 0)
+        error_met = true;
     asmblr_state_delete(asmblr);
-    return 0;
+
+    if (error_met)
+        return 1;
+    else
+        return 0;
 }
 static void skip_line(FILE* src)
 {
@@ -221,7 +226,7 @@ static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args,
         for (unsigned int poss_args_temp = poss_args, argnum_in_seq = 0; poss_args_temp != 0; poss_args_temp >>= 8, argnum_in_seq++)
         {
             char argword[MAXWRDLEN] = {};
-            fscanf(src, "%s", argword);
+            fscanf(src, "%" QUOTE(MAXWRDLEN) "s", argword);
             size_t len = strlen(argword);
             assert(!(poss_args_temp & 0x01) && "Invalid cmd list");
             bool do_ram  = false;
@@ -357,7 +362,6 @@ static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args,
         ERRMSG("Exceeded MAXARGN for (code)" CMD_CODE_FORMAT, cmd_code & LAST_BYTE_MASK);
         error_met = true;
     }
-    // printf("code = %hX, poss_args = %X, max_seqn = %u, gotseq = %u\n", cmd_code, poss_args, max_seqn, seqnum);
     if (error_met)
         return -1;
     return argnum;
@@ -402,20 +406,19 @@ static bool add_mark(asmblr_state_t* asmblr, char* name, size_t ip)
     if (i == (size_t)-1)
     {
         mark_t new_mark = {{}, ip};
-        strcpy(new_mark.name, name);
+        strncpy(new_mark.name, name, MAXWRDLEN);
         dynarr_push(asmblr->marks, &new_mark);
     }
     else
     {
         if (((mark_t*)dynarr_see(asmblr->marks, i))->ip != (size_t)-1)
         {
-            printf("Multiple mark definition: %s\n", ((mark_t*)dynarr_see(asmblr->marks, i))->name);
+            fprintf(stderr,  "Multiple mark definition: %s\n", ((mark_t*)dynarr_see(asmblr->marks, i))->name);
             return 0;
         }
         else
         {
             ((mark_t*)dynarr_see(asmblr->marks, i))->ip = ip;
-            // printf("add_mark_ip = %lu\n", ip);
         }
     }
     return 1;
@@ -479,7 +482,7 @@ static bool execute_fixup(asmblr_state_t* asmblr)
 
         if (fixed_ip == (size_t)-1)
         {
-            printf("Mark used but not defined: %s\n", mark->name);
+            fprintf(stderr,  "Mark used but not defined: %s\n", mark->name);
             return 0;
         }
         *(size_t*)dynarr_see(asmblr->code, fixup.ip) = fixed_ip;
@@ -487,13 +490,13 @@ static bool execute_fixup(asmblr_state_t* asmblr)
     return 1;
 }
 
-static void write_code(const char* dst_filename, dynarr_t* code)
+static int write_code(const char* dst_filename, dynarr_t* code)
 {
     FILE* dst = fopen(dst_filename, "wb");
     if (!dst)
     {
-        printf("Could not open file: %s\n", dst_filename);
-        return;
+        fprintf(stderr,  "Could not open file: %s\n", dst_filename);
+        return -1;
     }
 
     size_t code_size = dynarr_curr_size(code);
@@ -501,6 +504,14 @@ static void write_code(const char* dst_filename, dynarr_t* code)
     head.code_size = code_size;
     fwrite(&head, sizeof(head), 1, dst);
     fwrite(dynarr_see(code, 0), sizeof(char) , code_size, dst);
+    if (ferror(dst))
+    {
+        fprintf(stderr, "Failed to write code, ferror code = %d", ferror(dst));
+        fclose(dst);
+        return 1;
+    }
+    fclose(dst);
+    return 0;
 }
 
 static size_t get_curr_line(FILE* fstream)

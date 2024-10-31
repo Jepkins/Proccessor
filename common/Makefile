@@ -23,6 +23,7 @@ GLOBAL_INCLUDES = $(addprefix $(CURRENT_DIR)/, $(SUBDIRS))
 CFLAGS += $(LOCAL_INCLUDES)
 
 all: $(addprefix ../, $(OBJECTS))
+	@echo $(CURRENT_DIR): done
 
 -include $(DEPS)
 

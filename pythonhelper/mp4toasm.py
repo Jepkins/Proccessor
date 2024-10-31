@@ -2,10 +2,10 @@ import cv2 as cv
 import argparse
 import math
 
-SCREEN_WIDTH = 480
-SCREEN_HEIGHT = 360
+SCREEN_WIDTH = 384
+SCREEN_HEIGHT = 216
 
-MEMSET_LIMIT = 150
+MEMSET_LIMIT = 4
 
 def get_int_color(bgr, do_bnw):
     blue = min(bgr[0], 255)
@@ -17,7 +17,7 @@ def get_int_color(bgr, do_bnw):
         else:
             return 0xff000000
 
-    return int((255 << 24) | (blue << 16) | (green << 8) | red)
+    return int((255 << 24) | (red << 16) | (green << 8) | blue)
 
 def append_same (output, index, same_clr_len, curr_same_clr):
     if same_clr_len < MEMSET_LIMIT:
@@ -30,13 +30,13 @@ def process_video(input_file, output_file, do_bnw):
     video_capture = cv.VideoCapture(input_file)
 
     fps = int(video_capture.get(cv.CAP_PROP_FPS))
-    delay = 1e6 // fps
+    delay = int(1000000 // fps)
     frame_count = int(video_capture.get(cv.CAP_PROP_FRAME_COUNT))
     current_colors = [None] * (SCREEN_WIDTH * SCREEN_HEIGHT)
 
     output = []
 
-    for frame_index in range(frame_count): # MIND: frame_count
+    for frame_index in range(frame_count): 
         video_capture.set(cv.CAP_PROP_POS_FRAMES, frame_index)
         success, frame = video_capture.read()
 
