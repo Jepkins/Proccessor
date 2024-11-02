@@ -10,85 +10,6 @@ typedef struct {
     size_t code_size = 0;
 } spu_header_t;
 
-//                     MRI MI  RI  I
-//                     |   |   |   |
-// possible sequence:  0 0 0 0 0 0 0 0    --- lowest byte represents first argument
-//                       |   |   |   |
-//                       MR  M   R   MARK (incompatible with others)
-//                           |
-//                           invalid
-// I - immediate, R - register, M - RAM
-// Example: 0xEE - rvalues, 0xE4 - lvalues
-// Max sequence length = sizeof(int)
-//
-// seqn - max number of sequences
-//
-#define PROC_CMD_LIST \
-/*  code  name     seqn   possible sequence  */ \
-/*  |     |        |      |                  */ \
-    0xFF, unknown, 0,     0x00,                 \
-    0xF0, sleep,   1,     0xEE,                 \
-    0xF1, slpdif,  1,     0xEE,                 \
-    0x00, hlt,     0,     0x00,                 \
-    0x01, push,    10,    0xEE,                 \
-    0x02, pop,     10,    0xE4,                 \
-    0x03, mov,     1,     0xEEE4,               \
-    0x04, mst,     1,     0xEEEEE0,             \
-    0xA1, inv,     0,     0x00,                 \
-    0xA2, dub,     0,     0x00,                 \
-    0xA3, add,     0,     0x00,                 \
-    0xA4, sub,     0,     0x00,                 \
-    0xA5, mul,     0,     0x00,                 \
-    0xA6, div,     0,     0x00,                 \
-    0xA7, sqrt,    0,     0x00,                 \
-    0xA8, sin,     0,     0x00,                 \
-    0xA9, cos,     0,     0x00,                 \
-    0xAA, sqr,     0,     0x00,                 \
-    0xD1, jmp,     1,     0x01,                 \
-    0xD2, ja,      1,     0x01,                 \
-    0xD3, jae,     1,     0x01,                 \
-    0xD4, jb,      1,     0x01,                 \
-    0xD5, jbe,     1,     0x01,                 \
-    0xD6, je,      1,     0x01,                 \
-    0xD7, jne,     1,     0x01,                 \
-    0xDA, call,    1,     0x01,                 \
-    0xDB, ret,     0,     0x00,                 \
-    0xE0, putcc,   100,   0xEE,                 \
-    0xE1, in,      0,     0x00,                 \
-    0xE2, out,     0,     0x00,                 \
-    0xE3, dump,    0,     0x00,                 \
-    0xE4, draw,    0,     0x00,                 \
-    TERMINATOR
-
-#define PROC_REGS_LIST       \
-/*first 256 are reserved!!!*/\
-/*  ind   name             */\
-/*  |     |                */\
-    256,  AX,    \
-    257,  BX,    \
-    258,  CX,    \
-    259,  DX,    \
-    260,  EX,    \
-    261,  AY,    \
-    262,  BY,    \
-    263,  CY,    \
-    264,  DY,    \
-    265,  EY,    \
-    266,  AZ,    \
-    267,  BZ,    \
-    268,  CZ,    \
-    269,  DZ,    \
-    270,  EZ,    \
-    271,  RR,    \
-    272,  II,    \
-    273,  JJ,    \
-    274,  AA,    \
-    275,  BB,    \
-    276,  CC,    \
-    277,  DD,    \
-    278,  EE,    \
-    TERMINATOR
-
 typedef short cmd_code_t;
 #define CMD_CODE_FORMAT "%4hX"
 typedef uint32_t elm_t;
@@ -111,19 +32,19 @@ static const size_t PROC_RAM_SIZE = 1'000'000; // 1MB
 static const int DRAW_WIDTH = 100;
 static const int DRAW_HEIGHT = 100;
 
-#define COMMAND_ENUM_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ , CAT(CMD_, name) = (cmd_code_t) code
+#define DEFCMD_(code, name, argn, args) CAT(CMD_, name) = (cmd_code_t) code,
 enum command_nums {
     // Expands to [ CMD_unknown = (cmd_code_t) 0xff, CMD_hlt = (cmd_code_t) 0x00, ... ]
-    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, COMMAND_ENUM_PUSHEND, PROC_CMD_LIST)))
+    #include "defcmd.h"
 };
-#undef COMMAND_ENUM_PUSHEND
+#undef DEFCMD_
 
-#define REGISTER_ENUM_PUSHEND(ind, name, ...) __VA_ARGS__ , CAT(REG_, name) = (size_t) ind
+#define DEFREG_(ind, name) CAT(REG_, name) = (size_t) ind,
 enum reg_num_t {
     // FIRST MAXARGN (256) regs are reserved!!! (do not touch)
     // Expands to [ REG_AX = (size_t) 256, REG_BX = (size_t) 257, ... ]
-    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, REGISTER_ENUM_PUSHEND, PROC_REGS_LIST)))
+    #include "defreg.h"
 };
-#undef REGISTER_ENUM_PUSHEND
+#undef DEFREG_
 
 #endif // SPU_HEADER_H

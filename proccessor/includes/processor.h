@@ -38,10 +38,10 @@ static cmd_code_t proc_execute_next(proc_t* proc);
 static void  proc_getfullcmd (proc_t* proc);
 static void proc_getargs (proc_t* proc);
 
-#define PROC_EXECUTE_PROTOTYPE_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ static void PRIMITIVE_CAT(proc_execute_,name) (proc_t* proc);
+#define DEFCMD_(code, name, argn, args) static void CAT(proc_execute_,name) (proc_t* proc);
 // Expands to [ static void proc_execute_push (proc_t* proc); static void proc_execute_pop (proc_t* proc); ... ]
-EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PROC_EXECUTE_PROTOTYPE_PUSHEND, PROC_CMD_LIST, )))
-#undef PROC_EXECUTE_PROTOTYPE_PUSHEND
+#include "defcmd.h"
+#undef DEFCMD_
 
 static bool check_header (spu_header_t* head);
 static proc_t* proc_new (size_t elm_size);

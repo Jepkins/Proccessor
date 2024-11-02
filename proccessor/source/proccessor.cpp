@@ -104,6 +104,7 @@ static int proc_run()
                 {
                     run_conds.do_video = false;
                     proc->cnv->Quit();
+                    delete(proc->cnv);
                 }
             }
         }
@@ -199,7 +200,7 @@ static bool check_header (spu_header_t* head)
 }
 
 
-#define PROC_EXECUTE_CASES_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ case code: {CAT(proc_execute_, name)(proc); break;}
+#define DEFCMD_(code, name, argn, args) case code: {CAT(proc_execute_, name)(proc); break;}
 cmd_code_t proc_execute_next(proc_t* proc)
 {
     proc_getfullcmd(proc);
@@ -209,7 +210,7 @@ cmd_code_t proc_execute_next(proc_t* proc)
     // Expands to  case 0xff: {proc_execute_unknown(proc); break;}
     //             case 0x00: {proc_execute_hlt(proc); break;}
     //                               ...
-    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PROC_EXECUTE_CASES_PUSHEND, PROC_CMD_LIST, )))
+    #include "defcmd.h"
     default:
     {
         fprintf(stderr,  "Unknown command: " CMD_CODE_FORMAT "\n", proc->current_cmd.cmd_code);
@@ -218,7 +219,7 @@ cmd_code_t proc_execute_next(proc_t* proc)
     }
     return proc->current_cmd.cmd_code;
 }
-#undef PROC_EXECUTE_CASES_PUSHEND
+#undef DEFCMD_
 
 #define CMD_CODE_ proc->current_cmd.cmd_code
 #define ARG_PTR_(n) proc->current_cmd.args[n].ptr

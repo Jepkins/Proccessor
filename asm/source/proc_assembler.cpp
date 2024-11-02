@@ -172,19 +172,19 @@ static void skip_line(FILE* src)
     } while(c != '\n' && c != EOF);
 }
 
-#define ASMBLR_STRCMP_PUSHEND(code, name, seqn, args, ...) __VA_ARGS__ if(strcmp(cmd_word, QUOTE(name)) == 0) {return (CAT(CMD_, name) & LAST_BYTE_MASK);}
+#define DEFCMD_(code, name, seqn, args) if(strcmp(cmd_word, QUOTE(name)) == 0) {return (CAT(CMD_, name) & LAST_BYTE_MASK);}
 static cmd_code_t get_cmd_code(const char* cmd_word)
 {
     // Expands to   if(strcmp(cmd_word, "unknown") == 0) return (CMD_unknown & LAST_BYTE_MASK);
     //              if(strcmp(cmd_word, "hlt") == 0) return (CMD_hlt & LAST_BYTE_MASK);
     //                                    ...
-    EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, ASMBLR_STRCMP_PUSHEND, PROC_CMD_LIST, )))
+    #include "defcmd.h"
     return (CMD_unknown & LAST_BYTE_MASK);
 }
-#undef ASMBLR_STRCMP_PUSHEND
+#undef DEFCMD_
 
 
-#define PARSE_ARGS_IF_PUSHEND(index, name, ...) __VA_ARGS__                     \
+#define DEFREG_(index, name, ...)                                               \
     if(strcmp(reg, QUOTE(name)) == 0)                                           \
     {                                                                           \
         if (reg_met)                                                            \
@@ -302,7 +302,7 @@ static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args,
                 // Expands to   if(strcmp(reg, "AX") == 0) { ... continue;}
                 //              if(strcmp(reg, "BX") == 0) { ... continue;}
                 //                                      ...
-                EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, PARSE_ARGS_IF_PUSHEND, PROC_REGS_LIST, )))
+                #include "defreg.h"
 
                 // Not an argument
                 notanarg:
@@ -366,7 +366,7 @@ static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args,
         return -1;
     return argnum;
 }
-#undef PARSE_ARGS_IF_PUSHEND
+#undef DEFREG_
 
 static int parse_markarg(asmblr_state_t* asmblr, args_t* args, FILE* src)
 {
@@ -438,7 +438,7 @@ static size_t find_mark(asmblr_state_t* asmblr, const char* name)
     return i;
 }
 
-#define GET_POSS_ARGS_PUSHEND(code, name, argn, args, ...) __VA_ARGS__ case code: {return args;}
+#define DEFCMD_(code, name, argn, args) case code: {return args;}
 static unsigned int get_possible_args(cmd_code_t code)
 {
     code = code & LAST_BYTE_MASK;
@@ -447,13 +447,13 @@ static unsigned int get_possible_args(cmd_code_t code)
         // Expands to  case 0xff: {return 0x00;}
         //             case 0x00: {return 0x01;}
         //                        ...
-        EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, GET_POSS_ARGS_PUSHEND, PROC_CMD_LIST, )))
+        #include "defcmd.h"
         default: return 0;
     }
 }
-#undef GET_POSS_ARGS_PUSHEND
+#undef DEFCMD_
 
-#define GET_MAX_SEQN_PUSHEND(code, name, seqn, args, ...) __VA_ARGS__ case code: {return seqn;}
+#define DEFCMD_(code, name, seqn, args) case code: {return seqn;}
 static unsigned int get_max_seqn(cmd_code_t code)
 {
     code = code & LAST_BYTE_MASK;
@@ -462,11 +462,11 @@ static unsigned int get_max_seqn(cmd_code_t code)
         // Expands to  case 0xff: {return  0;}
         //             case 0x01: {return 10;}
         //                        ...
-        EXPAND(DEFER(DELETE_FIRST_1)(WHILE(NOT_END, GET_MAX_SEQN_PUSHEND, PROC_CMD_LIST, )))
+        #include "defcmd.h"
         default: return 0;
     }
 }
-#undef GET_MAX_SEQN_PUSHEND
+#undef DEFCMD_
 
 static bool execute_fixup(asmblr_state_t* asmblr)
 {
