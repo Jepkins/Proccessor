@@ -1,7 +1,7 @@
-#include "asm_flagging.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "asm_flagging.h"
 
 bool asmblr_setup(int argc, char** argv, StartConfig* run_conds)
 {

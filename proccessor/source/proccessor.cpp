@@ -467,7 +467,10 @@ static void proc_execute_div (proc_t* proc)
 // START: iostreams
 static void proc_execute_putcc (proc_t* proc)
 {
-    putc((int)ARG_(0), stdout);
+    for (size_t i = 0; i < ARGN_; i++)
+    {
+        putc((int)ARG_(i), stdout);
+    }
 }
 static void proc_execute_out (proc_t* proc)
 {

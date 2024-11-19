@@ -16,11 +16,14 @@ jae :nextfib
 
 push 1 pop DX
 :nextprint
-push [DX]
-out
 push DX+1 dub
 pop DX
 push AX
 jae :nextprint
+
+push DX 1 sub
+pop DX
+push [DX]
+out
 
 hlt

@@ -5,7 +5,7 @@ push RR+1 pop RR  ; radius
 call :drawcirc
 
 draw
-sleep 10
+slpdif 100000
 push 50 RR
 ja :end
 call ::main

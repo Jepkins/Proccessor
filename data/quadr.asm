@@ -5,13 +5,13 @@ hlt
 
 ;---------------------------------------------------------
 :getabc
-putcc 97 58 32
+putcc 97 58 32  ; a:_
 in
 pop AA
-putcc 98 58 32
+putcc 98 58 32  ; b:_
 in
 pop BB
-putcc 99 58 32
+putcc 99 58 32  ; c:_
 in
 pop CC
 ret
