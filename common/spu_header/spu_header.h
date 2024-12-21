@@ -32,6 +32,8 @@ static const size_t PROC_RAM_SIZE = 1'000'000; // 1MB
 static const int DRAW_WIDTH = 100;
 static const int DRAW_HEIGHT = 100;
 
+#define DOUBLE_PRECISION 1e-5
+
 #define DEFCMD_(code, name, argn, args) CAT(CMD_, name) = (cmd_code_t) code,
 enum command_nums {
     // Expands to [ CMD_unknown = (cmd_code_t) 0xff, CMD_hlt = (cmd_code_t) 0x00, ... ]

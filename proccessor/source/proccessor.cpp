@@ -71,15 +71,9 @@ static void proc_dtor (proc_t* proc)
 
 int main(int argc, char** argv)
 {
-    timer_cl t;
-    t.start();
     proc_setup(argc, argv, &run_conds);
 
-    if (proc_run() != 0)
-        return 1;
-    printf("done\n");
-    printf("TIME = %lu mks\n", t.mictime());
-    return 0;
+    return proc_run();
 }
 
 
@@ -343,13 +337,13 @@ static void proc_execute_jbe(proc_t* proc)
 static void proc_execute_je(proc_t* proc)
 {
     POP_POP(elm_new, elm_old)
-    if (elm_new == elm_old)
+    if (std::abs(elm_new - elm_old) < DOUBLE_PRECISION)
         proc->ip = (size_t)ARG_(0);
 }
 static void proc_execute_jne(proc_t* proc)
 {
     POP_POP(elm_new, elm_old)
-    if (elm_new != elm_old)
+    if (std::abs(elm_new - elm_old) > DOUBLE_PRECISION)
         proc->ip = (size_t)ARG_(0);
 }
 

@@ -5,7 +5,7 @@
 #include "dynarr.h"
 #include "stack.h"
 
-#define MAXWRDLEN  15
+#define MAXWRDLEN  30
 
 typedef struct {
     char name[MAXWRDLEN];
