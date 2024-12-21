@@ -295,17 +295,15 @@ static int parse_args(asmblr_state_t* asmblr, cmd_code_t cmd_code, args_t* args,
 
                 char reg[3] = {};
                 if (len - i >= 2)
+                {
                     sscanf(argword + i, "%2s", reg);
-                else
-                    goto notanarg;
-
-                // Expands to   if(strcmp(reg, "AX") == 0) { ... continue;}
-                //              if(strcmp(reg, "BX") == 0) { ... continue;}
-                //                                      ...
-                #include "defreg.h"
-
+                    // Expands to   if(strcmp(reg, "AX") == 0) { ... continue;}
+                    //              if(strcmp(reg, "BX") == 0) { ... continue;}
+                    //                                      ...
+                    #include "defreg.h"
+                }
+                
                 // Not an argument
-                notanarg:
                 if (i != do_ram)
                 {
                     error_met = true;

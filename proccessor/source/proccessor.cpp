@@ -430,6 +430,10 @@ static void proc_execute_cos (proc_t* proc)
 {
     POP_PUSH(elm, (elm_t)cos((double)elm))
 }
+static void proc_execute_log (proc_t* proc)
+{
+    POP_PUSH(elm, (elm_t)std::log((double)elm))
+}
 
 #undef POP_PUSH
 
@@ -458,6 +462,10 @@ static void proc_execute_mul (proc_t* proc)
 static void proc_execute_div (proc_t* proc)
 {
     POP_POP_PUSH(elm_new, elm_old, elm_old / elm_new)
+}
+static void proc_execute_pow (proc_t* proc)
+{
+    POP_POP_PUSH(elm_new, elm_old, std::pow(elm_old, elm_new))
 }
 
 #undef POP_POP_PUSH

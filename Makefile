@@ -13,9 +13,9 @@ PROC_DIR = proccessor
 ASM_DIR = asm
 COMMON_DIR = common
 
-COMMON_OBJECTS = $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) build='$(BUILD_DIR)' echo_objects)
-PROC_OBJECTS = $(shell $(MAKE) -s -C $(PROC_DIR) curr=$(PROC_DIR) build='$(BUILD_DIR)' echo_objects)
-ASM_OBJECTS   = $(shell $(MAKE) -s -C $(ASM_DIR) curr=$(ASM_DIR)   build='$(BUILD_DIR)' echo_objects)
+COMMON_OBJECTS =  $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) build='$(BUILD_DIR)' echo_objects)
+PROC_OBJECTS =    $(shell $(MAKE) -s -C $(PROC_DIR)   curr=$(PROC_DIR)   build='$(BUILD_DIR)' echo_objects)
+ASM_OBJECTS   =   $(shell $(MAKE) -s -C $(ASM_DIR)    curr=$(ASM_DIR)    build='$(BUILD_DIR)' echo_objects)
 COMMON_INCLUDES = $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) echo_includes)
 
 LDFLAGS += $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) echo_libs)
@@ -48,15 +48,12 @@ $(ASM_EXEC): make_common make_asm
 
 make_common:
 	@echo $(shell $(MAKE) -s -C $(COMMON_DIR) curr=$(COMMON_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' d_debug='$(d_debug)')
-	@sleep 0.1
 
 make_proc:
-	@echo $(shell $(MAKE) -s -C $(PROC_DIR) curr=$(PROC_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
-	@sleep 0.1
+	@echo $(shell $(MAKE) -s -C $(PROC_DIR)   curr=$(PROC_DIR)   comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
 
 make_asm:
-	@echo $(shell $(MAKE) -s -C $(ASM_DIR) curr=$(ASM_DIR) comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
-	@sleep 0.1
+	@echo $(shell $(MAKE) -s -C $(ASM_DIR)    curr=$(ASM_DIR)    comp='$(CC)' flags='$(CFLAGS)' build='$(BUILD_DIR)' common_incs='$(COMMON_INCLUDES)')
 
 code ?= data/code.bin
 source ?= data/test.asm

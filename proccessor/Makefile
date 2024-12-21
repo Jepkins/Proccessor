@@ -22,6 +22,7 @@ all: $(addprefix ../, $(OBJECTS))
 	@echo --making $(@:../%=%)--
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) $< -o $@
+	@wait
 
 echo_objects:
 	@echo $(OBJECTS)

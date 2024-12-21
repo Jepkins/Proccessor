@@ -6,14 +6,14 @@
 
 typedef struct {
     char signature[16] = "Jepkins";
-    double version = 3.6;
+    double version = 4.0;
     size_t code_size = 0;
 } spu_header_t;
 
 typedef short cmd_code_t;
 #define CMD_CODE_FORMAT "%4hX"
-typedef uint32_t elm_t;
-#define ELM_T_FORMAT "%u"
+typedef double elm_t;
+#define ELM_T_FORMAT "%lg"
 
 static const cmd_code_t SECOND_BYTE_MASK = (cmd_code_t)0xFF00;
 static const cmd_code_t LAST_BYTE_MASK   = (cmd_code_t)0x00FF;
